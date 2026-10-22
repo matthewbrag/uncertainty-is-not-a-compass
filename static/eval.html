@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>GSM8K Reasoning Eval</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1a1b1e;
+    --panel: #232428;
+    --border: #35363b;
+    --text: #e6e6e6;
+    --muted: #8a8d93;
+    --accent: #5bb8ff;
+    --accent-dim: #2a4a63;
+    --good: #7ee787;
+    --bad: #ff7b72;
+    --warn: #d99a4e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .titleRow { display: flex; align-items: center; gap: 16px; }
+  h1 {
+    font-size: 15px;
+    margin: 0;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  nav a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 5px;
+  }
+  nav a.active, nav a:hover { color: var(--text); background: var(--panel); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  textarea, input[type=text], input[type=number], select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  textarea#template { width: 100%; min-height: 50px; font-family: "SF Mono", Menlo, monospace; resize: vertical; }
+  button {
+    background: var(--accent-dim);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.2); }
+  button.primary { background: var(--accent); color: #0a0a0a; font-weight: 600; }
+  button.toggle.active { background: var(--accent); color: #0a0a0a; }
+  label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+  input[type=number] { width: 72px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  main { padding: 16px 20px; }
+  .statsBar {
+    display: flex;
+    gap: 24px;
+    padding: 12px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat .val { font-size: 20px; font-weight: 700; }
+  .stat .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .val.good { color: var(--good); }
+  .val.bad { color: var(--bad); }
+  .val.warn { color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr.dataRow { cursor: pointer; }
+  tr.dataRow:hover { background: #2d3036; }
+  td.qcell { max-width: 480px; }
+  .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 480px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.correct { background: #1e3a2a; color: var(--good); }
+  .badge.incorrect { background: #3a1e1e; color: var(--bad); }
+  .badge.truncated { background: #3a301a; color: var(--warn); }
+  tr.detailRow td {
+    background: #18191c;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .detailSection { margin-bottom: 10px; }
+  .detailSection h3 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin: 0 0 4px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titleRow">
+    <h1>GSM8K Reasoning Eval</h1>
+    <nav>
+      <a href="/">Explorer</a>
+      <a href="/eval" class="active">Eval</a>
+    </nav>
+    <label>Model <select id="modelPicker"></select></label>
+  </div>
+  <div class="row">
+    <label>N <input type="number" id="nSamples" value="20" min="1" max="500" /></label>
+    <label>Offset <input type="number" id="offset" value="0" min="0" /></label>
+    <label>Batch <input type="number" id="batchSize" value="8" min="1" max="32" /></label>
+    <label>Max tokens <input type="number" id="maxNewTokens" value="512" min="16" max="2048" /></label>
+    <label><input type="checkbox" id="enableThinking" /> Thinking mode</label>
+    <span style="width:1px;height:20px;background:var(--border)"></span>
+    <label>Mode
+      <select id="modeSelect">
+        <option value="sample" selected>Sample</option>
+        <option value="greedy">Greedy</option>
+      </select>
+    </label>
+    <label>Temp <input type="number" id="temperature" value="0.7" step="0.1" min="0" /></label>
+    <label>Top-k <input type="number" id="topK" value="20" step="1" min="0" /></label>
+    <label>Top-p <input type="number" id="topP" value="0.8" step="0.01" min="0" max="1" /></label>
+    <label>Min-p <input type="number" id="minP" value="0" step="0.01" min="0" max="1" /></label>
+  </div>
+  <div class="row">
+    <span class="hint">Presets (Qwen3 official model card recommendations):</span>
+    <button id="presetNonThinking">Non-thinking baseline (T0.7 / k20 / p0.8)</button>
+    <button id="presetThinking">Thinking baseline (T0.6 / k20 / p0.95)</button>
+    <button id="presetGreedy">Greedy control</button>
+  </div>
+  <div class="row">
+    <textarea id="template"></textarea>
+  </div>
+  <div class="row">
+    <button class="primary" id="runBtn">Run eval</button>
+    <button id="stopBtn" style="display:none">Stop</button>
+    <span id="runStatus" class="hint"></span>
+  </div>
+</header>
+
+<main>
+  <div class="statsBar">
+    <div class="stat"><div class="val" id="statAccuracy">—</div><div class="lbl">Accuracy</div></div>
+    <div class="stat"><div class="val" id="statCorrect">0 / 0</div><div class="lbl">Correct</div></div>
+    <div class="stat"><div class="val warn" id="statTruncated">0</div><div class="lbl">Truncated</div></div>
+  </div>
+
+  <div class="row" style="margin-bottom:12px">
+    <input type="text" id="searchBox" placeholder="search question / answer / reasoning..." style="width:320px" />
+    <button class="toggle active" id="filterAll" data-filter="all">All</button>
+    <button class="toggle" id="filterCorrect" data-filter="correct">Correct</button>
+    <button class="toggle" id="filterIncorrect" data-filter="incorrect">Incorrect</button>
+    <button class="toggle" id="filterTruncated" data-filter="truncated">Truncated</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40px">#</th>
+        <th style="width:70px">Result</th>
+        <th>Question</th>
+        <th style="width:90px">Reference</th>
+        <th style="width:90px">Predicted</th>
+      </tr>
+    </thead>
+    <tbody id="resultsBody"></tbody>
+  </table>
+</main>
+
+<script>
+const DEFAULT_TEMPLATE = "{question}\n\nSolve this step by step. Write each step on its own line starting with 'Step 1:', 'Step 2:', etc. After the final step, on its own line, write your final numeric answer in exactly this format: '#### <number>' (for example: '#### 42').";
+document.getElementById("template").value = DEFAULT_TEMPLATE;
+
+let allResults = [];
+let currentFilter = "all";
+let expandedIndex = null;
+let runAbortController = null;
+
+function escapeHtml(s) {
+  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function matchesFilter(r) {
+  if (currentFilter === "correct") return r.correct;
+  if (currentFilter === "incorrect") return !r.correct;
+  if (currentFilter === "truncated") return r.truncated;
+  return true;
+}
+
+function matchesSearch(r, q) {
+  if (!q) return true;
+  q = q.toLowerCase();
+  return (
+    r.question.toLowerCase().includes(q) ||
+    r.generated_text.toLowerCase().includes(q) ||
+    String(r.predicted_answer).toLowerCase().includes(q) ||
+    String(r.reference_answer).toLowerCase().includes(q)
+  );
+}
+
+function renderStats() {
+  const total = allResults.length;
+  const correct = allResults.filter((r) => r.correct).length;
+  const truncated = allResults.filter((r) => r.truncated).length;
+  document.getElementById("statAccuracy").textContent = total ? ((correct / total) * 100).toFixed(1) + "%" : "—";
+  document.getElementById("statAccuracy").className = "val " + (total && correct / total >= 0.5 ? "good" : "bad");
+  document.getElementById("statCorrect").textContent = `${correct} / ${total}`;
+  document.getElementById("statTruncated").textContent = truncated;
+}
+
+function renderTable() {
+  const q = document.getElementById("searchBox").value;
+  const body = document.getElementById("resultsBody");
+  body.innerHTML = "";
+
+  const filtered = allResults.filter((r) => matchesFilter(r) && matchesSearch(r, q));
+
+  for (const r of filtered) {
+    const row = document.createElement("tr");
+    row.className = "dataRow";
+    row.dataset.index = r.index;
+    row.innerHTML = `
+      <td>${r.index}</td>
+      <td>
+        <span class="badge ${r.correct ? "correct" : "incorrect"}">${r.correct ? "correct" : "wrong"}</span>
+        ${r.truncated ? '<span class="badge truncated">trunc</span>' : ""}
+      </td>
+      <td class="qcell"><span class="ellipsis">${escapeHtml(r.question)}</span></td>
+      <td>${r.reference_answer}</td>
+      <td>${r.predicted_answer === null ? "—" : r.predicted_answer}</td>
+    `;
+    row.addEventListener("click", () => {
+      expandedIndex = expandedIndex === r.index ? null : r.index;
+      renderTable();
+    });
+    body.appendChild(row);
+
+    if (expandedIndex === r.index) {
+      const detail = document.createElement("tr");
+      detail.className = "detailRow";
+      detail.innerHTML = `
+        <td colspan="5">
+          <div class="detailSection"><h3>Full question</h3>${escapeHtml(r.question)}</div>
+          <div class="detailSection"><h3>Reference solution</h3>${escapeHtml(r.reference_text)}</div>
+          <div class="detailSection"><h3>Model generation (${r.truncated ? "truncated, no EOS" : "completed"})</h3>${escapeHtml(r.generated_text)}</div>
+          <button class="exploreBtn primary" style="font-family:-apple-system,system-ui,sans-serif">Explore in token explorer &rarr;</button>
+        </td>
+      `;
+      const exploreBtn = detail.querySelector(".exploreBtn");
+      if (!r.prompt_token_ids || !r.generated_token_ids) {
+        exploreBtn.disabled = true;
+        exploreBtn.title = "no token ids recorded for this result";
+      } else {
+        exploreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          exploreResult(r, exploreBtn);
+        });
+      }
+      body.appendChild(detail);
+    }
+  }
+}
+
+async function exploreResult(r, btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "loading...";
+  try {
+    const res = await fetch("/api/session/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_token_ids: r.prompt_token_ids,
+        generated_token_ids: r.generated_token_ids,
+        model: r.model,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status}: ${text}`);
+    }
+    const data = await res.json();
+    window.open(`/?session=${data.session_id}`, "_blank");
+  } catch (e) {
+    alert("failed to import: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+function renderAll() {
+  renderStats();
+  renderTable();
+}
+
+document.getElementById("searchBox").addEventListener("input", renderTable);
+document.querySelectorAll("button.toggle").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("button.toggle").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.dataset.filter;
+    renderTable();
+  });
+});
+
+async function populateModelPicker() {
+  const picker = document.getElementById("modelPicker");
+  const res = await fetch("/api/models");
+  const data = await res.json();
+  picker.innerHTML = data.models
+    .map((m) => `<option value="${m.key}">${m.key}${m.loaded ? "" : " (not loaded yet)"}</option>`)
+    .join("");
+  picker.value = data.default;
+}
+populateModelPicker();
+
+async function runEval() {
+  const body = {
+    model: document.getElementById("modelPicker").value,
+    n_samples: parseInt(document.getElementById("nSamples").value, 10) || 20,
+    offset: parseInt(document.getElementById("offset").value, 10) || 0,
+    batch_size: parseInt(document.getElementById("batchSize").value, 10) || 8,
+    max_new_tokens: parseInt(document.getElementById("maxNewTokens").value, 10) || 512,
+    enable_thinking: document.getElementById("enableThinking").checked,
+    mode: document.getElementById("modeSelect").value,
+    temperature: parseFloat(document.getElementById("temperature").value) || 1.0,
+    top_k: parseInt(document.getElementById("topK").value, 10) || 0,
+    top_p: parseFloat(document.getElementById("topP").value) || 1.0,
+    min_p: parseFloat(document.getElementById("minP").value) || 0.0,
+    template: document.getElementById("template").value,
+  };
+
+  const runBtn = document.getElementById("runBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const status = document.getElementById("runStatus");
+
+  allResults = [];
+  expandedIndex = null;
+  renderAll();
+
+  runBtn.disabled = true;
+  stopBtn.style.display = "inline-block";
+  status.textContent = "starting...";
+  runAbortController = new AbortController();
+
+  try {
+    const res = await fetch("/api/eval/run_stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: runAbortController.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status}: ${text}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const payload = JSON.parse(line);
+        if (payload.type === "progress") {
+          allResults.push(...payload.batch_results);
+          status.textContent = `${payload.completed}/${payload.total} — running accuracy ${((payload.n_correct / payload.completed) * 100).toFixed(1)}%`;
+          renderAll();
+        } else if (payload.type === "done") {
+          status.textContent = `done — ${payload.n_correct}/${payload.n_total} (${(payload.accuracy * 100).toFixed(1)}%)`;
+        }
+      }
+    }
+  } catch (e) {
+    if (e.name === "AbortError") {
+      status.textContent = "stopped by user";
+    } else {
+      console.error(e);
+      status.textContent = "error: " + e.message;
+    }
+  } finally {
+    runBtn.disabled = false;
+    stopBtn.style.display = "none";
+    runAbortController = null;
+  }
+}
+
+function applyPreset(mode, temperature, topK, topP, minP, enableThinking) {
+  document.getElementById("modeSelect").value = mode;
+  document.getElementById("temperature").value = temperature;
+  document.getElementById("topK").value = topK;
+  document.getElementById("topP").value = topP;
+  document.getElementById("minP").value = minP;
+  if (enableThinking !== undefined) {
+    document.getElementById("enableThinking").checked = enableThinking;
+  }
+}
+document.getElementById("presetNonThinking").addEventListener("click", () => applyPreset("sample", 0.7, 20, 0.8, 0, false));
+document.getElementById("presetThinking").addEventListener("click", () => applyPreset("sample", 0.6, 20, 0.95, 0, true));
+document.getElementById("presetGreedy").addEventListener("click", () => applyPreset("greedy", 0, 1, 1.0, 0));
+
+document.getElementById("runBtn").addEventListener("click", () => runEval());
+document.getElementById("stopBtn").addEventListener("click", () => {
+  if (runAbortController) runAbortController.abort();
+});
+</script>
+</body>
+</html>

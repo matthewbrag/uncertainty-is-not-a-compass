@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Token Logit Explorer</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1a1b1e;
+    --panel: #232428;
+    --border: #35363b;
+    --text: #e6e6e6;
+    --muted: #8a8d93;
+    --accent: #5bb8ff;
+    --accent-dim: #2a4a63;
+    --forced: #d99a4e;
+    --sampled: #5bb8ff;
+    --selected: #7ee787;
+    --imported: #c38fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  h1 {
+    font-size: 15px;
+    margin: 0;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  textarea, input[type=text], input[type=number], select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  textarea { width: 100%; min-height: 50px; resize: vertical; font-family: "SF Mono", Menlo, monospace; }
+  button {
+    background: var(--accent-dim);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.2); }
+  button.primary { background: var(--accent); color: #0a0a0a; font-weight: 600; }
+  label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+  input[type=number] { width: 64px; }
+  main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  #tokenColumn {
+    flex: 2;
+    overflow-y: auto;
+    padding: 16px 20px;
+    border-right: 1px solid var(--border);
+  }
+  #sideColumn {
+    flex: 1;
+    min-width: 320px;
+    max-width: 420px;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #tokenStream {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 14px;
+    line-height: 2.2;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .chip {
+    display: inline-block;
+    padding: 1px 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .chip.prompt { color: var(--muted); cursor: default; }
+  .chip.sampled { border-color: var(--sampled); }
+  .chip.selected { border-color: var(--selected); }
+  .chip.forced { border-color: var(--forced); }
+  .chip.imported { border-color: var(--imported); }
+  .chip.active { background: #3a3d44; }
+  .chip:hover:not(.prompt) { background: #2d3036; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin: 0 0 10px 0;
+  }
+  .distRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    padding: 3px 0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .distRow:hover { background: #2d3036; }
+  .distToken {
+    width: 110px;
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .distBarWrap { flex: 1; background: #141518; border-radius: 3px; overflow: hidden; height: 14px; }
+  .distBar { height: 100%; background: var(--accent); }
+  .distProb { width: 52px; text-align: right; color: var(--muted); }
+  .legend { font-size: 11px; color: var(--muted); display: flex; gap: 14px; margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .hint { color: var(--muted); font-size: 12px; }
+  #detailMeta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:16px">
+    <h1>Token Logit Explorer</h1>
+    <nav style="display:flex;gap:4px">
+      <a href="/" style="color:var(--text);background:var(--panel);text-decoration:none;font-size:12px;padding:4px 8px;border-radius:5px">Explorer</a>
+      <a href="/eval" style="color:var(--muted);text-decoration:none;font-size:12px;padding:4px 8px;border-radius:5px">Eval</a>
+    </nav>
+    <label>Model <select id="modelPicker"></select></label>
+  </div>
+  <textarea id="promptInput" placeholder="Enter a prompt...">The capital of France is</textarea>
+  <div class="row">
+    <button class="primary" id="startBtn">Start / Reset</button>
+    <span style="width:1px;height:20px;background:var(--border)"></span>
+    <label>Mode
+      <select id="modeSelect">
+        <option value="sample" selected>Sample</option>
+        <option value="greedy">Greedy</option>
+      </select>
+    </label>
+    <label>Temp <input type="number" id="temperature" value="0.6" step="0.1" min="0.01" /></label>
+    <label>Top-k <input type="number" id="topK" value="20" step="1" min="0" /></label>
+    <label>Top-p <input type="number" id="topP" value="0.95" step="0.05" min="0" max="1" /></label>
+    <label>Min-p <input type="number" id="minP" value="0" step="0.01" min="0" max="1" /></label>
+    <button id="nextBtn">Generate next token</button>
+    <label>Steps <input type="number" id="runSteps" value="2000" step="1" min="1" max="4000" /></label>
+    <button id="runBtn" class="primary">Run</button>
+    <button id="stopBtn" style="display:none">Stop</button>
+    <span id="runStatus" class="hint"></span>
+    <span style="width:1px;height:20px;background:var(--border)"></span>
+    <input type="text" id="forceInput" placeholder="force text continuation..." style="width:260px" />
+    <button id="forceBtn">Force</button>
+  </div>
+  <div class="row">
+    <label>Color tokens by
+      <select id="colorMode">
+        <option value="entropy" selected>Raw entropy</option>
+        <option value="probe">Predicted outcome-entropy (linear probe)</option>
+        <option value="off">Off</option>
+      </select>
+    </label>
+    <label>Cap <input type="number" id="entropyCap" value="6" step="0.5" min="0.1" style="width:60px" /></label>
+    <div id="entropyLegend" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+      <span>confident / doomed</span>
+      <div style="width:120px;height:10px;border-radius:5px;background:linear-gradient(to right, hsla(210,75%,45%,0.5), hsla(105,75%,45%,0.5), hsla(0,75%,45%,0.5))"></div>
+      <span>uncertain / critical</span>
+    </div>
+    <span class="hint" id="colorModeHint">entropy of the raw final-layer token distribution, in bits</span>
+  </div>
+</header>
+
+<main>
+  <div id="tokenColumn">
+    <div id="tokenStream">Start a session to begin.</div>
+  </div>
+  <div id="sideColumn">
+    <div class="panel">
+      <h2>Next-token distribution (pending)</h2>
+      <div id="pendingDist"></div>
+    </div>
+    <div class="panel">
+      <h2>Selected step detail</h2>
+      <div id="detailMeta" class="hint">Click any generated token to inspect / replace it.</div>
+      <div id="detailDist"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="rewindBtn" style="display:none">Rewind to here (discard onward)</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--sampled)"></span>sampled</span>
+      <span><span class="dot" style="background:var(--selected)"></span>selected</span>
+      <span><span class="dot" style="background:var(--forced)"></span>forced</span>
+      <span><span class="dot" style="background:var(--imported)"></span>imported</span>
+    </div>
+  </div>
+</main>
+
+<script>
+let sessionId = null;
+let state = null;
+let detailStepIndex = null; // which history step's distribution is shown in the detail panel
+
+async function api(path, body) {
+  const opts = body
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    : { method: "GET" };
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function displayText(t) {
+  return escapeHtml(t).replace(/\n/g, "⏎\n");
+}
+
+function entropyColor(bits, cap) {
+  const t = Math.max(0, Math.min(1, bits / cap));
+  const hue = 210 - t * 210; // blue (confident) -> red (uncertain)
+  return `hsla(${hue}, 75%, 45%, ${0.15 + t * 0.4})`;
+}
+
+function colorValueFor(mode, h) {
+  if (mode === "entropy") return h.entropy;
+  if (mode === "probe") return h.predicted_outcome_entropy;
+  return null;
+}
+
+function render() {
+  if (!state) return;
+
+  const colorMode = document.getElementById("colorMode").value;
+  const cap = parseFloat(document.getElementById("entropyCap").value) || 6;
+
+  const hint = document.getElementById("colorModeHint");
+  if (colorMode === "entropy") {
+    hint.textContent = "entropy of the raw final-layer token distribution, in bits";
+  } else if (colorMode === "probe") {
+    hint.textContent = "linear probe's predicted outcome-entropy (0.6B only) — how likely resampling here is to flip the final answer";
+  } else {
+    hint.textContent = "";
+  }
+
+  const stream = document.getElementById("tokenStream");
+  let html = "";
+  for (const pt of state.prompt_tokens) {
+    html += `<span class="chip prompt">${displayText(pt.token_text)}</span>`;
+  }
+  state.history.forEach((h, i) => {
+    const activeCls = i === detailStepIndex ? " active" : "";
+    const val = colorValueFor(colorMode, h);
+    const bg = colorMode !== "off" && val != null ? `background-color:${entropyColor(val, cap)};` : "";
+    const titleParts = [];
+    if (h.entropy != null) titleParts.push(`entropy: ${h.entropy.toFixed(2)} bits`);
+    if (h.predicted_outcome_entropy != null) titleParts.push(`predicted outcome-entropy: ${h.predicted_outcome_entropy.toFixed(3)}`);
+    const title = titleParts.length ? ` title="${titleParts.join(' · ')}"` : "";
+    html += `<span class="chip ${h.source}${activeCls}" data-step="${i}" style="${bg}"${title}>${displayText(h.token_text)}</span>`;
+  });
+  stream.innerHTML = html || "(empty)";
+
+  stream.querySelectorAll(".chip[data-step]").forEach((el) => {
+    el.addEventListener("click", () => showDetail(parseInt(el.dataset.step, 10)));
+  });
+
+  const pendingHeader = document.querySelector("#sideColumn .panel h2");
+  if (pendingHeader) {
+    const parts = ["Next-token distribution (pending)"];
+    if (state.next_entropy != null) parts.push(`entropy: ${state.next_entropy.toFixed(2)} bits`);
+    if (state.next_predicted_outcome_entropy != null) {
+      parts.push(`predicted outcome-entropy: ${state.next_predicted_outcome_entropy.toFixed(3)}`);
+    }
+    pendingHeader.textContent = parts.join(" — ");
+  }
+
+  renderDist(document.getElementById("pendingDist"), state.next_distribution, (tokenId) => {
+    selectToken(state.history.length, tokenId);
+  });
+
+  renderDetail();
+}
+
+function renderDist(container, dist, onPick) {
+  container.innerHTML = "";
+  const maxProb = Math.max(...dist.map((d) => d.prob), 1e-9);
+  for (const d of dist) {
+    const row = document.createElement("div");
+    row.className = "distRow";
+    row.innerHTML = `
+      <div class="distToken" title="${displayText(d.token_text)}">${displayText(d.token_text)}</div>
+      <div class="distBarWrap"><div class="distBar" style="width:${(d.prob / maxProb) * 100}%"></div></div>
+      <div class="distProb">${(d.prob * 100).toFixed(1)}%</div>
+    `;
+    row.addEventListener("click", () => onPick(d.token_id));
+    container.appendChild(row);
+  }
+}
+
+function renderDetail() {
+  const meta = document.getElementById("detailMeta");
+  const dist = document.getElementById("detailDist");
+  const rewindBtn = document.getElementById("rewindBtn");
+
+  if (detailStepIndex === null || detailStepIndex >= state.history.length) {
+    meta.textContent = "Click any generated token to inspect / replace it.";
+    dist.innerHTML = "";
+    rewindBtn.style.display = "none";
+    return;
+  }
+
+  const h = state.history[detailStepIndex];
+  const entropyStr = h.entropy != null ? ` · entropy: ${h.entropy.toFixed(2)} bits` : "";
+  const probeStr = h.predicted_outcome_entropy != null ? ` · predicted outcome-entropy: ${h.predicted_outcome_entropy.toFixed(3)}` : "";
+  meta.textContent = `step ${detailStepIndex} · chosen "${h.token_text}" · source: ${h.source}${h.mode ? " (" + h.mode + ")" : ""}${entropyStr}${probeStr}`;
+  renderDist(dist, h.topk, (tokenId) => selectToken(detailStepIndex, tokenId));
+  rewindBtn.style.display = "inline-block";
+  rewindBtn.onclick = () => selectToken(detailStepIndex, null);
+}
+
+function showDetail(stepIndex) {
+  detailStepIndex = stepIndex;
+  render();
+}
+
+async function populateModelPicker() {
+  const picker = document.getElementById("modelPicker");
+  const data = await api("/api/models");
+  picker.innerHTML = data.models
+    .map((m) => `<option value="${m.key}">${m.key}${m.loaded ? "" : " (not loaded yet)"}</option>`)
+    .join("");
+  picker.value = data.default;
+}
+
+async function startSession() {
+  const prompt = document.getElementById("promptInput").value;
+  const model = document.getElementById("modelPicker").value;
+  state = await api("/api/session", { prompt, model });
+  sessionId = state.session_id;
+  detailStepIndex = null;
+  render();
+}
+
+async function loadSession(id) {
+  state = await api(`/api/session/${id}`);
+  sessionId = id;
+  detailStepIndex = null;
+  document.getElementById("modelPicker").value = state.model;
+  document.getElementById("promptInput").value =
+    state.prompt_tokens.map((t) => t.token_text).join("") + " (imported session — prompt tokens, not raw text)";
+  render();
+}
+
+async function selectToken(stepIndex, tokenId) {
+  state = await api(`/api/session/${sessionId}/select`, { step_index: stepIndex, token_id: tokenId });
+  detailStepIndex = tokenId === null ? null : stepIndex;
+  render();
+}
+
+async function nextToken() {
+  const mode = document.getElementById("modeSelect").value;
+  const temperature = parseFloat(document.getElementById("temperature").value) || 1.0;
+  const top_k = parseInt(document.getElementById("topK").value, 10) || 0;
+  const top_p = parseFloat(document.getElementById("topP").value) || 1.0;
+  const min_p = parseFloat(document.getElementById("minP").value) || 0.0;
+  state = await api(`/api/session/${sessionId}/next`, { mode, temperature, top_k, top_p, min_p });
+  render();
+}
+
+let runAbortController = null;
+
+async function runSteps() {
+  const mode = document.getElementById("modeSelect").value;
+  const temperature = parseFloat(document.getElementById("temperature").value) || 1.0;
+  const top_k = parseInt(document.getElementById("topK").value, 10) || 0;
+  const top_p = parseFloat(document.getElementById("topP").value) || 1.0;
+  const min_p = parseFloat(document.getElementById("minP").value) || 0.0;
+  const steps = parseInt(document.getElementById("runSteps").value, 10) || 1;
+  const btn = document.getElementById("runBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const status = document.getElementById("runStatus");
+
+  btn.disabled = true;
+  stopBtn.style.display = "inline-block";
+  status.textContent = "generating... (click Stop to interrupt)";
+  runAbortController = new AbortController();
+
+  let lastReason = null;
+  try {
+    const res = await fetch(`/api/session/${sessionId}/run_stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, temperature, top_k, top_p, min_p, steps, stop_on_eos: true }),
+      signal: runAbortController.signal,
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const payload = JSON.parse(line);
+        state = payload;
+        lastReason = payload.stop_reason;
+        render();
+      }
+    }
+    status.textContent = lastReason ? `stopped early: ${lastReason}` : "done";
+  } catch (e) {
+    if (e.name === "AbortError") {
+      status.textContent = "stopped by user";
+    } else {
+      throw e;
+    }
+  } finally {
+    btn.disabled = false;
+    stopBtn.style.display = "none";
+    runAbortController = null;
+  }
+}
+
+async function forceText() {
+  const text = document.getElementById("forceInput").value;
+  if (!text) return;
+  state = await api(`/api/session/${sessionId}/force`, { text });
+  document.getElementById("forceInput").value = "";
+  render();
+}
+
+document.getElementById("startBtn").addEventListener("click", () => startSession().catch(alertErr));
+document.getElementById("nextBtn").addEventListener("click", () => nextToken().catch(alertErr));
+document.getElementById("runBtn").addEventListener("click", () => runSteps().catch(alertErr));
+document.getElementById("stopBtn").addEventListener("click", () => {
+  if (runAbortController) runAbortController.abort();
+});
+document.getElementById("forceBtn").addEventListener("click", () => forceText().catch(alertErr));
+document.getElementById("modeSelect").addEventListener("change", (e) => {
+  const sampleOnly = e.target.value === "sample";
+  // no-op visual hint; fields remain editable regardless
+});
+document.getElementById("colorMode").addEventListener("change", (e) => {
+  const capInput = document.getElementById("entropyCap");
+  // raw entropy is in bits (0-~17); predicted outcome-entropy is bounded ~0-1
+  capInput.value = e.target.value === "probe" ? 0.5 : 6;
+  render();
+});
+document.getElementById("entropyCap").addEventListener("input", () => render());
+
+function alertErr(e) {
+  console.error(e);
+  alert(e.message || String(e));
+}
+
+async function bootstrap() {
+  await populateModelPicker();
+  const importedSessionId = new URLSearchParams(location.search).get("session");
+  if (importedSessionId) {
+    await loadSession(importedSessionId);
+  } else {
+    await startSession();
+  }
+}
+bootstrap().catch(alertErr);
+</script>
+</body>
+</html>

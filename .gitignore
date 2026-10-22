@@ -1,0 +1,18 @@
+# Raw collected data and logs -- large (multi-GB) and fully regeneratable
+# by running the collection scripts against the public datasets/model.
+# Not the source of truth; the scripts are.
+*.jsonl
+*.log
+*.output
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+.claude/
+
+# Benchmark/scratch data artifacts from legacy/ scripts -- not source files.
+*.npy
+util_log*.csv
+
+# entropy_probe_*.json artifacts (~100-900KB each) are NOT excluded above --
+# they're small enough to keep in git directly, unlike the raw *.jsonl data.

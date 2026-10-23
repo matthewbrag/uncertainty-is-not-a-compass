@@ -150,6 +150,21 @@ knowing the correct answer, which defeats the purpose of a cheap proxy. Or:
 some property of HOW the branches disagree, not just THAT they disagree.)
 Not yet explored.
 
+**Candidate mechanism for why ("the step problem"):** forced-branch
+continuations run up to 300 new tokens after the fork. Even a totally
+meaningless early difference (phrasing, step-numbering) can cascade through
+300 tokens of the model conditioning on its own prior output and land on a
+different final number, with no real reasoning fork involved. This would
+explain the article's own "step" observation (a pure formatting token
+scored high entropy despite not being a decision at all) AND the oracle
+result (diversity partly measures cascade-amplified noise, not genuine
+decision-criticality). Testable prediction: diversity measured close to the
+END of a trace (less room left to cascade) should correlate with
+rescuability better than diversity measured early. NOT YET TESTED — would
+need per-branch continuation lengths, which aren't currently saved; a clean
+test would need a new small collection (short-capped vs full-length
+continuations at the same points). Flagged, not run, as of 2026-10-22.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND

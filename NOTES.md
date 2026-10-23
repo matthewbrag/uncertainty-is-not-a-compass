@@ -1,0 +1,142 @@
+# Running notes
+
+Started 2026-10-22, because we forgot to take them earlier and it cost us a
+round-trip re-verifying which papers we'd already checked. Add to this as we
+go. Most important entries first within each section.
+
+## Methodology traps (read this before trusting a new result)
+
+- **Trace resampling confound (found 2026-10-22, UNRESOLVED).** Every
+  tournament/experiment script re-generates its own greedy trace per problem
+  with `do_sample=True, temperature=0.7` in `generate_batch_sampled`. Only
+  problem *ordering* is seeded (`random.seed(7000)`) — the actual generation
+  is never seeded via `torch.manual_seed`. So "problem #482" in two separate
+  runs can produce two completely different wrong traces (different length,
+  different error location, different rescuability). This silently confounds
+  ANY cross-run comparison, including supposedly "paired" designs like the
+  monotonic-noise experiment (same problem indices across alpha arms, but
+  NOT the same underlying decode trace per arm).
+  - Confirmed concretely twice: (1) restoring a clobbered MATH-L4 shard with
+    the same seed gave 173 scored vs the original 170 (3-problem flip); (2)
+    `random`/`uniform` on the monotonic-noise run's problem subset scored
+    30.7% in the original tournament file vs the noise experiment's
+    independently-generated traces showing very different numbers for
+    nominally the same problems.
+  - **Fix to try**: generate the traces ONCE per problem set (prompt_ids +
+    gen_ids, greedy_correct flag), save to a shared file, and have every
+    variant (noise levels, hybrid strategy, whatever comes next) load that
+    *same* fixed trace instead of calling `generate_batch_sampled` itself.
+    Only the branch-forcing step should still touch the model fresh. This
+    turns every multi-arm comparison into an actually-paired design instead
+    of a confounded one. Haven't built this yet — next thing to do if we
+    want to trust fine-grained comparisons (noise curve shape, hybrid vs
+    uniform) rather than just large, obvious gaps.
+  - Until this is fixed: trust big, consistent, multiply-replicated gaps
+    (uniform beating probe_p by 5+pp across two difficulty levels). Don't
+    trust small gaps from a single run, and don't directly compare rescue
+    rates across *different scripts' runs* even on "the same" problems.
+
+- **Always use a scratch output path for smoke tests, never a real one.**
+  Did this wrong once already — overwrote a real 170-record tournament shard
+  with a 3-record smoke test by reusing the production filename. Every new
+  script's smoke test should point at `/tmp/.../scratchpad/...` explicitly.
+
+- **Binary outcome_entropy (correctness) vs diversity_entropy are different
+  metrics — r=0.278 between them.** Binary asks "did the branches agree on
+  being right"; diversity asks "did the branches agree at all." A position
+  where all 5 branches converge on the same WRONG answer scores 0 under
+  both. A position where all 5 branches give 5 DIFFERENT wrong answers
+  scores 0 under binary but ~log2(5)=2.32 (max) under diversity. Most of
+  this project's early results (anything from before this was caught) used
+  the wrong one. Diversity is the one to use going forward — check any old
+  number's target before reusing it.
+
+## Key findings so far
+
+**Part 1 (entropy estimators, vs diversity_entropy target, all verified):**
+- Simple Entropy, Embedding Weighted Entropy, DRAGIN (faithful RIND repro):
+  all |r| < 0.15 on every dataset/model tested. Flat noise.
+- Trained probe (Ridge, best layer): R²=0.32-0.50, r=0.57-0.71. The one real
+  positive signal in Part 1.
+- Architecture barely matters once the target is right: Ridge and gradient
+  boosting trade the lead by noise-level margins everywhere. MLPs (32 and
+  64→8 units) consistently worse than both.
+- Low-dimensional-subspace hypothesis (does a 1-4 unit bottleneck match
+  Ridge?) is domain-split, not universal: nearly matches/beats Ridge on
+  GSM8K (0.6B bottleneck even beats it, R²=0.512 vs 0.497), goes NEGATIVE on
+  both MATH levels. Real, surprising, worth featuring.
+
+**Part 2 (tournament, MATH domain, 1.7B model):**
+- `uniform` (deterministic even-spacing, zero learned signal) ties or beats
+  every smart strategy tested, confirmed independently on MATH-L3 (wins
+  outright, 45.7%) and MATH-L4 (ties probe_diversity_spaced, ~40.7-40.9%).
+  Not a cost tradeoff either — uniform is cheapest AND best.
+  CAVEAT (2026-10-22): the MATH-L4 "final" numbers (uniform 40.7%,
+  probe_diversity_spaced 40.9%) came from a merged file where one shard was
+  regenerated after the smoke-test-clobber incident above — so even this
+  headline number has some trace-resampling noise baked in versus the
+  original run. Directionally solid (replicated independently on MATH-L3
+  too), but don't quote the exact decimal as gospel.
+- `probe_p` (top-5 by predicted success probability, no spacing) is worst on
+  every single test, every dataset. Consistently.
+- Naive top-k on a real, correlated signal (`probe_diversity`) actually
+  LOSES to doing nothing (uniform) — because top-scoring positions cluster
+  spatially (signal is locally correlated), so you waste your 5-branch
+  budget testing near-duplicate positions.
+- Two independent fixes for that clustering problem (spacing/NMS-exclusion,
+  and Gumbel-softmax sampling) each close the gap to "tied with uniform" —
+  neither has ever been shown to beat it. This replicates an EARLIER round
+  from before this session's summary too (probe_p → probe_p_softmax, same
+  "tied, never beats" pattern) — now a repeated finding across two separate
+  investigations.
+- Filtering junk/filler tokens from the candidate pool: tested twice
+  (tournament-level simulation + correlation-level), both clean nulls. ~70%
+  of problems don't even have 5 non-junk candidates to filter to.
+- Softmax-sampled vs top-k forced BRANCH TOKENS (different axis — this is
+  about which tokens to force once you've picked a position, not which
+  positions to pick): also null, and not even complementary (same rescues,
+  not different ones).
+
+**In flight, not yet resolved:**
+- Monotonic noise sweep (mixing trained probe score with Gaussian noise,
+  alpha=0 to 1): alpha=0.25 still running. See trace-resampling caveat above
+  before trusting the curve shape.
+- Spacing+softmax hybrid strategy (combines both anti-clustering fixes into
+  one): running, not yet landed. Question: does combining both finally beat
+  uniform, or just tie it like each does alone?
+
+## Papers checked (verified via direct fetch, not memory)
+
+- **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND
+  formula = H_i * a_max(i) * s_i (entropy × max future attention × stopword
+  gate). Faithfully reproduced; comes back ~0 correlation with our ground
+  truth either target. 69.5% of our candidate points get zeroed by the
+  stopword gate alone — our selection heuristic and DRAGIN's gate are
+  selecting for near-opposite things.
+- **EDEN** (Evans/Ganesh/Ardon, JP Morgan AI Research, arXiv:2605.09745) —
+  never tests uniform-spacing-vs-smart-selection at all. Baselines are all
+  generation strategies (greedy/sampling/beam/best-of-n), not
+  position-selection strategies.
+- **Entropy-Tree** (Wei et al., SJTU/Huawei/Nankai/NTU, arXiv:2601.15296) —
+  DOES claim entropy-guided beats random branching (Section 4.4), but the
+  methodology is underspecified enough that we can't confirm it's testing
+  the same thing we tested (random POSITION vs random TOKEN-at-a-position
+  are different axes, and the paper doesn't say which).
+- **Zur et al.** ("Are LMs Aware of the Road Not Taken?", arXiv:2511.04527)
+  — the paper this whole project extends. Linear probe, token-level,
+  predicts outcome distribution of forced continuations. Only ever uses
+  linear probes, never compares to nonlinear — so it's NOT a citation for
+  "a published method found linear architecture wins," just for "linear
+  probes have precedent here."
+- **"Reasoning Can Be Restored..."** (Shen et al., arXiv:2605.16874) — tests
+  a stochastic random-position baseline, but at a 6x LARGER budget than
+  their smart method (ρ=0.25 vs ρ≈0.04) and still loses. Different task
+  (weak-model token correction via a stronger model), not directly
+  comparable to our setup.
+
+## Repo
+
+Git-initialized, committed (`/home/matthew/projects/ml-experiments/tree2`).
+Core pipeline at top level, superseded/exploratory scripts in `legacy/`.
+README documents the pipeline. Raw data gitignored (regeneratable, too big
+for git anyway).

@@ -215,6 +215,45 @@ for v1, not worth blocking on. Worth revisiting later: does raising
 `GEN_MAX_NEW_TOKENS` for MATH-L4 specifically change baseline accuracy or
 the rescue-rate numbers? Not tested.
 
+## FINAL comprehensive run (2026-10-23, trust this one — shared-trace, n=420)
+
+Full 829-problem MATH-L4 test set, 3 shards, all completed. Shared-trace
+design (no trace-resampling confound), raised budgets (GEN_MAX_NEW_TOKENS=650,
+CONT_MAX_NEW_TOKENS=450, confirmed cap-hits are genuine reasoning not loops),
+continuation-length tracking included. This supersedes every earlier
+monotonic/hybrid number in this file — use these.
+
+```
+strategy                  rescued  avg tok/branch  avg tok(correct)  tok/rescue
+uniform                    43.1%           314.2            292.4       18227
+noise_alpha0.5              40.2%           327.5            319.7       20346
+noise_alpha0.25             40.0%           323.1            316.4       20191
+noise_alpha0.75             39.5%           333.0            319.9       21064
+random                      39.3%           319.1            305.7       20305
+hybrid_spaced_softmax       38.8%           324.3            306.8       20892
+noise_alpha0.0 (pure probe) 38.3%           315.9            307.6       20605
+noise_alpha1.0 (pure noise) 36.2%           319.4            301.8       22060
+```
+
+Uniform wins outright again, on every axis (rate, avg cost, total cost per
+rescue) — now with the budget fix in place too, so the generation-cap issue
+wasn't hiding a different result. Noise curve still doesn't show a clean
+monotonic shape (0.5 > 0.25 > 0.75, not a straight line), but the extremes
+are suggestive: alpha=0.0 and alpha=1.0 are the two lowest of the five noise
+arms. Hybrid strategy (39.4% in the earlier confounded single-run) settled
+at 38.8% here — below uniform, consistent with the oracle finding, confirms
+that earlier number was mostly noise as suspected.
+
+**Token efficiency (new this run, answers "avg tokens to correct a wrong
+answer"):**
+```
+correct branches:   305.5 tokens avg (n=5428), 21.6% hit the cap
+incorrect branches: 325.3 tokens avg (n=51107), 53.3% hit the cap
+```
+Wrong answers aren't just wrong — they're measurably more expensive too.
+Correct branches converge and conclude; incorrect ones are 2.5x more likely
+to run out of budget without resolving at all.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND

@@ -187,6 +187,24 @@ destruction, changes essentially nothing. This is the strongest, cleanest
 result in the whole project. Fully resolves the article's "Oracle and Oracle
 Monotonic" section — no methodology caveat needed, this one's trustworthy.
 
+## MATH-L4 generation cap finding (2026-10-22, not yet acted on)
+
+41.3% of unique MATH-L4 traces (372/900) hit the 500-token generation cap
+(`GEN_MAX_NEW_TOKENS`). GSM8K: 0%, mean 147 tokens vs MATH-L4's mean 382.
+Checked 10 capped traces directly with `detect_repetition` — 0/10 were
+actual repetition loops; the guard (`ForceEosOnRepetition`) is working fine,
+there mostly aren't loops here to catch. Reading the raw tail content, these
+are genuinely varied, substantive reasoning (case enumeration, solving
+systems, trig identities) that just doesn't finish in budget.
+
+Implication: this is a correctness lever, not a speed one — the model may be
+getting a meaningful fraction of MATH-L4 wrong simply because it's cut off
+mid-reasoning, independent of any entropy/search-strategy question. Current
+setup (GEN_MAX_NEW_TOKENS=500 + the repetition-loop guard) is good enough
+for v1, not worth blocking on. Worth revisiting later: does raising
+`GEN_MAX_NEW_TOKENS` for MATH-L4 specifically change baseline accuracy or
+the rescue-rate numbers? Not tested.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND

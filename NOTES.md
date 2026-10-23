@@ -167,6 +167,16 @@ continuations at the same points). Flagged, not run, as of 2026-10-22.
 
 ## Oracle MONOTONIC test (2026-10-22, clean, trust this one fully)
 
+**Cut from the article's v1** (2026-10-22) — not because the result is
+wrong, but scope/energy: cut late at night, wanted to avoid debugging one
+more angle before publishing. The data below is still valid and still the
+cleanest methodology of anything run tonight (CPU-only, zero
+trace-resampling confound, n=900) — it's just not in the public writeup
+yet. Worth reviving for a v2 once rested; it actually reinforces rather than
+contradicts the live monotonic test (both say diversity doesn't predict
+rescuability well, even measured perfectly in the oracle's case).
+
+
 Extended the oracle test into a full noise curve: mix the real diversity_entropy
 with Gaussian noise at alpha=0/0.25/0.5/0.75/1.0, same fixed data (900
 problems, math_level4_qwen3-1.7b.jsonl), same pairing across every alpha

@@ -105,6 +105,43 @@ go. Most important entries first within each section.
   one): running, not yet landed. Question: does combining both finally beat
   uniform, or just tie it like each does alone?
 
+## THE finding (2026-10-22, oracle test)
+
+Ran the oracle version of the selection question: rank candidate points by
+the REAL (not probe-predicted) diversity_entropy, computed directly from
+already-recorded forced-branch answers in `math_level4_qwen3-1.7b.jsonl` (900
+problems, zero new GPU compute, CPU-only reuse of existing data).
+
+```
+oracle (perfect diversity_entropy) top-5: 61.0% rescued
+random 5 of available candidates:         60.4%
+spread evenly among candidates:           60.3%
+outcome flips between oracle and random on only 3.4% of problems
+```
+
+Even PERFECT, noiseless knowledge of true outcome diversity barely beats
+random (0.6pp). This is not a probe-quality problem — it's structural.
+Diversity entropy measures whether the 5 forced branches DISAGREE; it does
+not measure whether the CORRECT answer is among them. A maximally-diverse
+point (5 different wrong answers) can be completely unrescuable; a
+low-diversity point can happen to contain the right answer anyway. These are
+different properties. The entire premise behind Part 2 — "a good-enough
+divergence measurement should let you pick better branch points" — doesn't
+survive contact with the oracle. This reframes the whole uniform-wins result:
+it's not that our probe approximation of diversity wasn't good enough, it's
+that diversity (even known perfectly) may not be the right target for THIS
+downstream task at all. Possibly the single most important result in the
+project — bigger than the binary-vs-diversity correction, because it
+suggests diversity itself (not just our measurement of it) is the wrong
+thing to optimize for rescue-oriented branch selection.
+
+Open question this raises: is there a DIFFERENT real-but-cheap property that
+WOULD predict rescuability better than diversity does? (E.g., something like
+"probability mass on the correct answer specifically" — but that requires
+knowing the correct answer, which defeats the purpose of a cheap proxy. Or:
+some property of HOW the branches disagree, not just THAT they disagree.)
+Not yet explored.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND

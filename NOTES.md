@@ -236,8 +236,22 @@ noise_alpha1.0 (pure noise) 36.2%           319.4            301.8       22060
 ```
 
 Uniform wins outright again, on every axis (rate, avg cost, total cost per
-rescue) — now with the budget fix in place too, so the generation-cap issue
-wasn't hiding a different result. Noise curve still doesn't show a clean
+rescue) — now with the budget change in place too, so the generation-cap
+issue wasn't hiding a different result.
+
+**IMPORTANT CORRECTION (2026-10-23): the budget raise did NOT fix the
+truncation problem, it only partially reduced it.** Checked directly:
+initial-trace cap-hit rate actually got WORSE (41.3% at cap=500 -> 55.7% at
+cap=650) even though the cap went up - mean trace length jumped 382->528,
+meaning the model used the extra room rather than the problem going away.
+Forced-branch cap-hit rate did improve (69.8%->50.2%) but that "before"
+number came from a tiny n=3 smoke test, so treat the improvement loosely.
+Real conclusion: this isn't "500 was almost enough," it's a genuinely
+heavy-tailed distribution where a real subpopulation of MATH-L4 problems
+needs much more than any modest budget bump provides. Don't claim this is
+"fixed" in the article - it's smaller, not resolved. Would need either a
+much larger cap (1000+?) or to just report it as a structural property of
+the domain. Noise curve still doesn't show a clean
 monotonic shape (0.5 > 0.25 > 0.75, not a straight line), but the extremes
 are suggestive: alpha=0.0 and alpha=1.0 are the two lowest of the five noise
 arms. Hybrid strategy (39.4% in the earlier confounded single-run) settled

@@ -97,13 +97,21 @@ go. Most important entries first within each section.
   positions to pick): also null, and not even complementary (same rescues,
   not different ones).
 
-**In flight, not yet resolved:**
-- Monotonic noise sweep (mixing trained probe score with Gaussian noise,
-  alpha=0 to 1): alpha=0.25 still running. See trace-resampling caveat above
-  before trusting the curve shape.
-- Spacing+softmax hybrid strategy (combines both anti-clustering fixes into
-  one): running, not yet landed. Question: does combining both finally beat
-  uniform, or just tie it like each does alone?
+**In flight / landed, needs re-verification:**
+- Monotonic noise sweep (n=~99/arm, MATH-L4): alpha=0.0→34.0%, 0.25→32.3%,
+  0.5→29.9% (dip), 0.75→pending, 1.0→42.9%. NOT monotonic so far, but see
+  trace-resampling caveat above — alpha=1.0's jump matches what you'd see
+  from trace variance alone, not necessarily a real effect. Don't trust the
+  curve shape until re-run with shared traces.
+- Spacing+softmax hybrid strategy: 39.4% (39/99), MATH-L4. Higher than the
+  same-subset `random`/`uniform` (30.7%) and `probe_diversity_spaced`
+  (35.2%) pulled from the original tournament file — but same
+  trace-resampling confound applies, AND it's in tension with the oracle
+  result just above (if even perfect diversity knowledge only beats random
+  by 0.6pp, an 8-9pp jump from a selection-mechanism fix on the same noisy
+  signal is a lot to explain). Treat as "interesting, re-verify" not
+  "uniform finally beaten." Re-run after the trace-resampling fix before
+  believing it.
 
 ## THE finding (2026-10-22, oracle test)
 

@@ -165,6 +165,28 @@ need per-branch continuation lengths, which aren't currently saved; a clean
 test would need a new small collection (short-capped vs full-length
 continuations at the same points). Flagged, not run, as of 2026-10-22.
 
+## Oracle MONOTONIC test (2026-10-22, clean, trust this one fully)
+
+Extended the oracle test into a full noise curve: mix the real diversity_entropy
+with Gaussian noise at alpha=0/0.25/0.5/0.75/1.0, same fixed data (900
+problems, math_level4_qwen3-1.7b.jsonl), same pairing across every alpha
+level (not a fresh GPU run — zero trace-resampling confound, unlike the
+probe-based monotonic/hybrid GPU experiments above).
+
+```
+alpha=0.00 (pure oracle signal): 60.9%
+alpha=0.25:                       61.1%
+alpha=0.50:                       61.2%
+alpha=0.75:                       61.0%
+alpha=1.00 (pure noise):          60.2%
+```
+
+Completely flat. Not just "oracle barely beats random" (the single-point
+result) — degrading the oracle signal by ANY amount, all the way to total
+destruction, changes essentially nothing. This is the strongest, cleanest
+result in the whole project. Fully resolves the article's "Oracle and Oracle
+Monotonic" section — no methodology caveat needed, this one's trustworthy.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND
@@ -188,6 +210,13 @@ continuations at the same points). Flagged, not run, as of 2026-10-22.
   linear probes, never compares to nonlinear — so it's NOT a citation for
   "a published method found linear architecture wins," just for "linear
   probes have precedent here."
+- **Branching Policy Optimization** (He, Chen, Zhang, Liu, arXiv:2607.14171)
+  — Table 3: uniformly-random (64.5±1.4%), equally-spaced (65.2±1.5%), their
+  entropy-guided method (67.8±1.3%). Entropy-guided genuinely beats uniform
+  here, with real error bars, outside the overlap. Different domain though
+  (WebShop agent tasks, not math reasoning) and different model (Qwen2.5-7B).
+  Worth engaging with directly in the writeup rather than ignoring — it's a
+  real counter-example, not a methodology gap like Entropy-Tree's.
 - **"Reasoning Can Be Restored..."** (Shen et al., arXiv:2605.16874) — tests
   a stochastic random-position baseline, but at a 6x LARGER budget than
   their smart method (ρ=0.25 vs ρ≈0.04) and still loses. Different task

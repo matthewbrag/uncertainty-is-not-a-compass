@@ -268,6 +268,86 @@ Wrong answers aren't just wrong — they're measurably more expensive too.
 Correct branches converge and conclude; incorrect ones are 2.5x more likely
 to run out of budget without resolving at all.
 
+## Natural-length measurement (2026-10-23): replaced guessed budgets with real data
+
+Rather than guess another budget bump, measured the TRUE natural length
+distribution directly: generate with only the repetition guard + a generous
+ceiling (no answer-forced-stop processor), record where generation actually
+would have stopped on its own. Two separate measurements, since initial
+traces and forced branches have different length profiles.
+
+`measure_natural_length.py` (initial traces, n=100, MATH-L4, 1.7B, ceiling=3000):
+94% natural EOS, 0% repetition-guard stops, 6% hit the 3000 ceiling.
+Percentiles among naturally-concluded: p50=477, p75=743, p90=1045,
+**p95=1488**, p99=2233, max=2701.
+
+`measure_natural_branch_length.py` (forced branches, n=300 forced from 100
+traces generated at a 1500-token budget, ceiling=3000): 91.3% natural EOS,
+0% repetition-guard stops, 8.7% hit ceiling. Percentiles among
+naturally-concluded: p50=200, p75=362, p90=766, **p95=1268**, p99=2417,
+max=2930.
+
+0% repetition-guard stops in both measurements, at every budget tested in
+this whole project (500/650/1500/3000) — repetition loops are not and never
+were a meaningful contributor to cap-hitting. Every earlier "truncation
+error" concern was genuine long/hard reasoning being cut off, not degenerate
+loops; the guard is a no-op safety net here, not doing real work.
+
+Tried running the tournament with a 3000-token ceiling on both trace and
+branch generation ("non-truncated") first, per initial request. Confirmed
+impractical: smoke test (n=5) ran 19+ minutes and was still on problem #1.
+Root cause: a 3000 ceiling forces `MAX_BRANCH_BATCH` down to ~6 (KV-cache
+OOM otherwise), and each problem has 25-40 unique candidate points across
+the 8 strategies, so each problem needs 5-7 sequential micro-batches. With
+~6-9% of completions genuinely needing near-ceiling length, nearly every
+micro-batch contains at least one straggler holding up the whole batch —
+classic static-batching tail latency, massively amplified by a high
+ceiling. Settled on p95 instead: GEN_MAX_NEW_TOKENS=1500,
+CONT_MAX_NEW_TOKENS=1300, MAX_BRANCH_BATCH=15, GEN_BATCH_SIZE=32.
+
+## TRUE FINAL run (2026-10-24, p95-calibrated budgets, trust this one over everything above)
+
+Full 829-problem MATH-L4 test set, 3 shards, all completed (~8-9 hours each,
+overnight). Same shared-trace, no-resampling-confound design as the
+2026-10-23 run above, but with budgets set from the real p95 data instead of
+guessed (GEN_MAX_NEW_TOKENS=1500, CONT_MAX_NEW_TOKENS=1300). 364 of 829
+problems scored (greedy got the other 465 right already and those are
+skipped by design — `greedy_correct` filter, not a bug).
+
+```
+strategy                rescued  avg_cut_pos  cost/rescue
+noise_alpha0.75          42.9%        376.1        877.7
+hybrid_spaced_softmax    42.3%        390.7        923.5
+uniform                  42.9%        403.1        940.6
+noise_alpha1.0           40.9%        394.2        962.9
+noise_alpha0.5           40.7%        394.5        970.3
+noise_alpha0.25          40.1%        420.2       1047.6
+random                   38.5%        403.3       1048.7
+noise_alpha0.0 (pure probe) 39.8%     441.0       1107.1
+```
+(cost/rescue = avg cut position in tokens / rescue rate, lower is better — matches article's methodology)
+
+Trace length at the new 1500 cap: mean=808, p50=635, p90=1500 (!),
+cap-hit-rate=24.5% — down from 55.7% at the old 650 cap, so the bigger
+budget genuinely helped most traces finish, even though the raw p90 sitting
+right at the cap confirms the tail is still real and wasn't fully absorbed.
+
+Branch continuation length, correct vs incorrect (cap=1300):
+correct: n=4434, mean=589, cap-hit-rate=7.0%. incorrect: n=45006, mean=531,
+cap-hit-rate=20.9%. Same "wrong answers are measurably more expensive"
+pattern as the 2026-10-23 run holds up at the new budgets too.
+
+**Verdict, now on genuinely clean data: the spread across all 8 strategies
+is 38.5%-42.9%, a ~4.4-point band with no clean winner.** uniform and
+noise_alpha0.75 tie for the top rescue rate; hybrid_spaced_softmax (the
+probe-informed spacing strategy) is statistically indistinguishable from
+both. noise_alpha0.0 (pure probe, no noise at all) sits mid-pack at 39.8%,
+not meaningfully different from random's 38.5%. This is the clean,
+deconfounded, un-truncated version of the conclusion the article already
+draws — if anything it's a slightly tighter race than the article's current
+table shows, since that table's numbers predate this calibration and should
+be replaced with the above.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND

@@ -348,6 +348,59 @@ draws — if anything it's a slightly tighter race than the article's current
 table shows, since that table's numbers predate this calibration and should
 be replaced with the above.
 
+## Recursive/adaptive multi-pivot search (2026-10-24/25): depth loses to breadth
+
+Tested whether the tournament's structural limitation — fork once, run that
+fork straight to completion, never check whether the branch itself later
+hits another high-entropy spot — was costing real rescues. Two scripts:
+
+`recursive_pivot_search.py`: blind fixed-depth recursion. Fork into 3
+lineages at one point, each independently re-pivots up to 3 total times,
+forcing a rank-2 token each time (rank-1 would be a no-op since completions
+are greedy-decoded). Smoke test (n=19) showed a real design flaw: final-depth
+rescue rate came back identical to first-pivot-only rescue rate, because
+blind re-pivoting has no way to know it already landed correct and can
+clobber a right answer with a wrong one. Killed before a full run.
+
+`adaptive_diversity_search.py`: fixed that by gating recursion on *observed*
+outcome agreement instead of predicting it. At every pivot, force
+BRANCH_FACTOR=3 alternatives, run each to completion, check if they agree
+(Shannon entropy over distinct answers, same ground-truth metric as Part 1,
+just read off live branches instead of a trained probe). Agreement -> settle,
+don't recurse (nothing to gain, real risk of clobbering). Disagreement ->
+recurse into each disagreeing branch, up to MAX_DEPTH=3 pivot events total.
+Pivot-point *selection* still uses the diversity probe; only the
+stop-vs-recurse decision stopped trusting it.
+
+Full run, all 829 MATH-L4 problems' 364 known-wrong subset, 1.7B model:
+
+```
+true rescue rate (of genuinely-wrong-on-regen): 19.4% (60/309)
+tournament's best strategy for comparison:       42.9% (uniform)
+already-correct answers clobbered anyway:        11/55 (20%)
+avg forced completions per problem:               21.7 (max 39, the depth-3 ceiling)
+hit the full depth-3 ceiling:                     221/364 (60.7%)
+agreement on the very first pivot:                31.1% (matches Part 1's ~35.5% GSM8K baseline)
+```
+
+**Verdict: depth from one starting point loses badly to breadth across
+several independent starting points (19.4% vs 42.9%).** The adaptive gating
+successfully avoids blind clobbering (confirmed: the earlier flaw doesn't
+reproduce here) but still underperforms by a wide margin, because recursing
+deeper only ever explores the neighborhood of wherever the first pivot
+landed — if that neighborhood is a dead end, no amount of depth escapes it.
+The tournament's 5-points-x-5-branches design gets to try genuinely
+different regions of the trace, and that breadth matters more than the
+depth this experiment added. Consistent with the rest of the project: the
+engineered, "smarter" approach loses to the simpler one again, just along a
+new axis (depth vs breadth instead of probe vs random/uniform).
+
+Caveat: this used freshly-regenerated traces (do_sample=True, unseeded) for
+each of the 364 problems, not the exact same traces as the FINAL p95-budget
+tournament run above -- so it's a directionally clear result, not a
+perfectly paired comparison. Re-running on the identical saved traces would
+tighten this but wasn't judged worth the compute given how large the gap is.
+
 ## Papers checked (verified via direct fetch, not memory)
 
 - **DRAGIN** (Su et al. 2024, arXiv:2403.10081) — real paper, real RIND

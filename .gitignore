@@ -16,3 +16,4 @@ util_log*.csv
 
 # entropy_probe_*.json artifacts (~100-900KB each) are NOT excluded above --
 # they're small enough to keep in git directly, unlike the raw *.jsonl data.
+.venv-vllm/

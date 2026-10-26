@@ -50,6 +50,10 @@ for path in sys.argv[2:]:
         pred = ((hs - p_mean) / p_scale) @ p_coef + probe["intercept"]
         d["local_ent"] = [round(float(v), 3) for v in ent]
         d["probe_pred"] = [round(float(v), 3) for v in pred]
+        # top-10 of the distribution that produced each token, for the explorer's logit view
+        top_p, top_i = logp.exp().topk(10, dim=-1)
+        d["topk"] = [[[tok.decode([int(t)]), round(float(p), 4)] for t, p in zip(ti, tp)]
+                     for ti, tp in zip(top_i.tolist(), top_p.tolist())]
         print(f"#{d['test_index']}: {n} tokens, mean local entropy {ent.mean():.3f} bits, "
               f"{(ent < 0.01).float().mean():.0%} near-zero", flush=True)
         del out

@@ -49,7 +49,7 @@ for arm in R[0]["arms"]:
     for r in R:
         ref = r["reference_answer"]
         br = r["arms"][arm]
-        budget = sum(b["length"] for b in br)
+        budget = sum(b["length"] for b in br) + r.get("arm_overhead", {}).get(arm, 0)
         rs = matched_restarts(r, budget)
         toks += budget
         ns += len(rs)
@@ -63,6 +63,10 @@ for arm in R[0]["arms"]:
     print(f"{arm:16s} {toks / n:6.0f} {any_a / n:6.1%} {maj_a / n:6.1%} |                    {ns / n:5.1f} "
           f"{any_r / n:6.1%} {maj_r / n:6.1%} | +{win} -{loss} p={mcnemar(win, loss):.3f}")
 
+if "prune_stats" in R[0]:
+    ps = [r["prune_stats"] for r in R]
+    print("\npruning: avg candidates {:.1f}, pruned as rejoining {:.1f}, as duplicates {:.1f}".format(
+        *(sum(p[k] for p in ps) / n for k in ("candidates", "rejoin", "duplicate"))))
 print("\nall 32 restarts: any {:.1%}  maj {:.1%}".format(
     sum(any(s["correct"] for s in r["restarts"]) for r in R) / n,
     sum(correct(majority([s["answer"] for s in r["restarts"]]), r["reference_answer"]) for r in R) / n))

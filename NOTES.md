@@ -486,3 +486,32 @@ Why the probe loses (debug_strategy_trace.py + analysis):
 - "Rescue" mixes restarts, final-answer digit lottery (e.g. forcing "1"->"2" in
   "Final Answer: 18"), and genuine repair. Next tournament should save trace
   ids so rescues can be classified post hoc.
+
+## vLLM advanced tournament (2026-10-26, 56 min on 3 GPUs vs ~7h on HF)
+
+382 scored greedy-wrong MATH-L4 problems, 9 arms, all paired on identical
+traces (advanced_tournament_vllm.py, analyze_tournament.py). Rescue rate:
+sampled_restarts x25 52.4% (vs uniform +38/-13, p=0.001, but 18.4k tok/problem);
+restart+{local_only, product, stratified_probe} 48.2%; zsum 47.9%;
+resample_uniform_cuts 47.9% (cheapest: 11.8k tok); restart+uniform_interior 46.6%;
+restart+product_guarded 46.3%; uniform 45.8%. No forced-branch arm beats
+uniform significantly (best p~0.15).
+
+Combo test (does the outcome probe add anything on top of local entropy?):
+product vs local_only +7/-7 p=1.0; zsum vs local_only +6/-7; guarded vs
+local_only +12/-19 p=0.28. -> No. Consistent with "Beyond the 80/20 Rule"
+(arXiv 2506.01939): local entropy already marks the forks.
+
+Compute-matched best-of-N (sampled restarts up to the arm's own token budget):
+49.0% at uniform's budget (vs 45.8%), 50.5% at guarded's (vs 46.3%), 47.9% at
+resample_uniform_cuts' (tie). Nothing beat plain resampling at equal compute.
+
+Mechanism: local-entropy arms' rescuing cuts are 56-58% word-level decisions
+vs 24-31% for uniform/probe (which rescue largely via formatting-token
+"restarts in disguise", 30-35%). Picking meaningful forks does not rescue more
+problems than perturbing anywhere -- for small-model math, branch-point choice
+barely matters.
+
+Also (validate_vllm.py / diag_vllm.py): ~35% of greedy forced branches change
+final answer between HF and vLLM from bf16 kernel differences alone -- branch
+outcomes are fragile; treat single-branch labels as noisy.

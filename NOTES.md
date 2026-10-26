@@ -6,6 +6,21 @@ go. Most important entries first within each section.
 
 ## Methodology traps (read this before trusting a new result)
 
+- **Off-by-one in branch forcing (found + fixed 2026-10-25, commit a35e858).
+  Invalidates every forced-branch number before that commit.** Forced tokens
+  came from `hs[base+cut-1]` (the distribution predicting `gen_ids[cut]`) but
+  the prefix was `gen_ids[:cut+1]`, so they were appended AFTER the real
+  token, in slot cut+1. Top-1 "alternative" was always a duplicate of the
+  token just written ("of of", "she she" -- 13/13 checked). Affected: all
+  ground-truth collection (GSM8K + MATH), every probe trained on it, every
+  tournament, the noise curve, measure_natural_branch_length. NOT affected:
+  trace-only measurements (trace lengths, cap-hit rates, repetition guard),
+  and adaptive_diversity_search.py / recursive_pivot_search.py, which used
+  the correct convention -- which also means the "adaptive 19.4% vs
+  tournament 42.9%" comparison below mixes conventions and is not valid.
+  Critical-path rerun (MATH-L4 1.7B collect -> probe -> tournament) via
+  run_fixed_pipeline.sh, all outputs named *_fixed.
+
 - **Trace resampling confound (found 2026-10-22, UNRESOLVED).** Every
   tournament/experiment script re-generates its own greedy trace per problem
   with `do_sample=True, temperature=0.7` in `generate_batch_sampled`. Only

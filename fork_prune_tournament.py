@@ -22,6 +22,7 @@ Usage (.venv-vllm): CUDA_VISIBLE_DEVICES=<gpu> python fork_prune_tournament.py <
 import fcntl
 import json
 import math
+import os
 import random
 import re
 import sys
@@ -174,9 +175,12 @@ def rejoins(lookahead_ids, gen, cut):
     tokens appear verbatim in the original continuation shortly after the cut."""
     if len(lookahead_ids) < 12:
         return False
-    tail = tokenizer.decode(lookahead_ids[-12:], skip_special_tokens=True).strip()
-    window = tokenizer.decode(gen[cut: cut + LOOKAHEAD + 64], skip_special_tokens=True)
-    return len(tail) > 8 and tail in window
+    # normalize away whitespace, markdown and LaTeX-wrapper differences ("_{6}" vs
+    # "_\\text{6}", ".  \\n\\n" vs ".\\n\\n"): exact matching missed many real rejoins
+    norm = lambda s: re.sub(r"\\text|[\s*#_{}$\\-]", "", s)
+    tail = norm(tokenizer.decode(lookahead_ids[-12:], skip_special_tokens=True))
+    window = norm(tokenizer.decode(gen[cut: cut + LOOKAHEAD + 64], skip_special_tokens=True))
+    return len(tail) > 6 and tail in window
 
 
 t_start = time.time()
@@ -212,6 +216,18 @@ with open(OUT_PATH, "w") as f:
             # 1) lookahead on every pruning candidate
             la_in = [job["pids"] + job["gen"][:c] + [t] for job in jobs for c, t in job["cand"]]
             la_out = generate(llm, la_in, LOOKAHEAD, sample=False)
+            if os.environ.get("PRUNE_DEBUG"):  # optional: dump every candidate's lookahead for inspection
+                with open(os.environ["PRUNE_DEBUG"], "a") as dbg:
+                    k2 = 0
+                    for job in jobs:
+                        for c, t in job["cand"]:
+                            la = la_out[k2]; k2 += 1
+                            dbg.write(json.dumps({
+                                "idx": job["idx"], "cut": c,
+                                "context": tokenizer.decode(job["gen"][max(0, c - 25):c]),
+                                "original": tokenizer.decode(job["gen"][c:c + LOOKAHEAD + 1]),
+                                "alt": tokenizer.decode([t]) + tokenizer.decode(la),
+                                "rejoins": c > 0 and rejoins(la, job["gen"], c)}) + "\n")
             k = 0
             for job in jobs:
                 kept, seen, n_pruned_rejoin, n_pruned_dup, la_tokens = [], set(), 0, 0, 0

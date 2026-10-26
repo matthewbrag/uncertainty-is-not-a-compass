@@ -69,6 +69,31 @@ for h in HEUR:
     real = np.mean([x > thr for x in picks])
     print(f"{h:12s} {np.mean(rhos):+17.3f} {np.mean(picks):14.3f} {real:17.1%} {real / max(1e-9, np.mean([x > thr for x in rand])):14.2f}x")
 
+def partial_rank(x, y, z):
+    """Spearman of x and y after regressing both ranks on z's rank (position control)."""
+    rx, ry, rz = (np.argsort(np.argsort(v)).astype(float) for v in (x, y, z))
+    if np.std(rz) == 0:
+        return np.nan
+    res = lambda a: a - np.polyval(np.polyfit(rz, a, 1), rz)
+    ex, ey = res(rx), res(ry)
+    if np.std(ex) == 0 or np.std(ey) == 0:
+        return np.nan
+    return float(np.corrcoef(ex, ey)[0, 1])
+
+
+print("\nposition-controlled within-trace rho (heuristic vs fork TV, partialling out position):")
+for h in HEUR[:-1]:
+    vals = []
+    for r in R:
+        pts = [(t, r["positions"][str(t)]) for t in r["random_positions"]]
+        if len(pts) >= 6:
+            v = partial_rank([p[h] for _, p in pts], [p["fork_tv"] for _, p in pts], [t for t, _ in pts])
+            if not np.isnan(v):
+                vals.append(v)
+    pos_corr = np.mean([spearman([p[h] for p in [r["positions"][str(t)] for t in r["random_positions"]]],
+                                 r["random_positions"]) for r in R if len(r["random_positions"]) >= 6])
+    print(f"  {h:12s} partial rho {np.mean(vals):+.3f}   (its own rho with position: {pos_corr:+.3f})")
+
 print("\nexample top-3 picks per heuristic (first 3 traces): token | fork TV")
 for r in R[:3]:
     print(f"  trace #{r['math_test_index']}")

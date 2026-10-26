@@ -1,11 +1,16 @@
 """
 Dependency-free copies of app.py's answer parsing and repetition detection,
 so the vLLM venv (which doesn't have app.py's FastAPI/datasets stack) uses the
-exact same rules. Keep in sync with app.py: ANSWER_MARKER_RE, LAST_NUMBER_RE,
-extract_answer, detect_repetition.
+exact same rules. Keep in sync with app.py: DEFAULT_TEMPLATE, ANSWER_MARKER_RE,
+LAST_NUMBER_RE, extract_answer, detect_repetition.
 """
 import re
 
+DEFAULT_TEMPLATE = (
+    "{question}\n\nSolve this step by step. Write each step on its own line starting with "
+    "'Step 1:', 'Step 2:', etc. After the final step, on its own line, write your final "
+    "numeric answer in exactly this format: '#### <number>' (for example: '#### 42')."
+)
 ANSWER_MARKER_RE = re.compile(r"####\s*\$?(-?[\d,]*\.?\d+)")
 LAST_NUMBER_RE = re.compile(r"-?\$?\d[\d,]*\.?\d*")
 

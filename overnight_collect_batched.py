@@ -42,7 +42,7 @@ GEN_MAX_NEW_TOKENS = 400
 CONT_MAX_NEW_TOKENS = 250
 GEN_BATCH_SIZE = 64  # sweet spot measured for both 0.6b and 1.7b today
 SAMPLE_KW = dict(temperature=0.7, top_k=20, top_p=0.8)
-OUT_PATH = f"overnight_{MODEL_KEY}_shard{SHARD_ID}.jsonl"
+OUT_PATH = sys.argv[5] if len(sys.argv) > 5 else f"overnight_{MODEL_KEY}_shard{SHARD_ID}.jsonl"
 
 gsm8k_train = load_dataset("openai/gsm8k", "main")["train"]
 tokenizer, model = get_model(MODEL_KEY)

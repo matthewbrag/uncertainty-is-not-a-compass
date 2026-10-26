@@ -36,29 +36,34 @@ def diversity_entropy(answers):
 
 
 print("Loading data...", flush=True)
-X_list, y_list, keys = [], [], []
+X_by_layer, y_list, keys = {}, [], []
 with open(IN_PATH) as f:
     for line in f:
         r = json.loads(line)
-        X_list.append(r["hidden_states"][LAYER])
+        for L, v in r["hidden_states"].items():
+            X_by_layer.setdefault(L, []).append(v)
         y_list.append(diversity_entropy(r["answers"]))
-        keys.append(r["math_train_index"])
-X = np.array(X_list, dtype=np.float32)
+        keys.append(r.get("math_train_index", r.get("gsm8k_train_index")))
+X_by_layer = {L: np.array(v, dtype=np.float32) for L, v in X_by_layer.items()}
 y = np.array(y_list)
 keys = np.array(keys)
 print(f"{len(y)} points loaded, mean diversity_entropy={y.mean():.3f}", flush=True)
 
-# held-out check, split by problem so traces never straddle train/test
+# held-out check at every recorded layer, split by problem so traces never
+# straddle train/test -- this is what the Part 1 table reports
 uniq = np.unique(keys)
 rng = np.random.default_rng(0)
 rng.shuffle(uniq)
 test_keys = set(uniq[: len(uniq) // 5].tolist())
 is_test = np.array([k in test_keys for k in keys])
-sc = StandardScaler().fit(X[~is_test])
-held = RidgeCV(alphas=np.logspace(-2, 8, 30)).fit(sc.transform(X[~is_test]), y[~is_test])
-pred = held.predict(sc.transform(X[is_test]))
-print(f"held-out (by problem) r={np.corrcoef(pred, y[is_test])[0, 1]:.4f}  "
-      f"R2={r2_score(y[is_test], pred):.4f}  (n_test={is_test.sum()})", flush=True)
+for L in sorted(X_by_layer, key=int):
+    XL = X_by_layer[L]
+    sc = StandardScaler().fit(XL[~is_test])
+    held = RidgeCV(alphas=np.logspace(-2, 8, 30)).fit(sc.transform(XL[~is_test]), y[~is_test])
+    pred = held.predict(sc.transform(XL[is_test]))
+    print(f"layer {L:>2}: held-out (by problem) r={np.corrcoef(pred, y[is_test])[0, 1]:.4f}  "
+          f"R2={r2_score(y[is_test], pred):.4f}  (n_test={is_test.sum()})", flush=True)
+X = X_by_layer[LAYER]
 
 # final artifact trains on everything
 scaler = StandardScaler()

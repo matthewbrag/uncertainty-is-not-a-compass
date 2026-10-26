@@ -515,3 +515,25 @@ barely matters.
 Also (validate_vllm.py / diag_vllm.py): ~35% of greedy forced branches change
 final answer between HF and vLLM from bf16 kernel differences alone -- branch
 outcomes are fragile; treat single-branch labels as noisy.
+
+## Fork-vote tournament (2026-10-26): branching loses decisively once an answer must be chosen
+
+382 scored MATH-L4 problems (fork_vote_tournament.py / analyze_fork_vote.py).
+Cuts = token 0 + top local entropy per segment; original-token branch dropped.
+Each arm vs best-of-N sampled restarts at the SAME token budget on the same problem:
+
+  arm            any    majority | matched best-of-N any / maj | maj paired
+  fork_greedy    46.9%  14.4%    | 45.8% / 22.3%               | +9  -39 p<0.001
+  fork_sampled   48.2%  14.7%    | 46.3% / 22.3%               | +12 -41 p<0.001
+  fork_resample  47.6%  13.1%    | 45.5% / 20.9%               | +11 -41 p<0.001
+
+Branches landing back on the trace's own wrong answer: 43.3% / 42.4% / 45.8%
+vs 32.7% for independent restarts. Sampled continuations / unforced resampling
+do NOT decorrelate: the correlation comes from the shared wrong prefix, not
+from greedy decoding. Under oracle selection branching is ~1-2 pts ahead;
+under majority vote it is ~8 pts behind independent sampling at equal compute.
+
+Also from the vLLM advanced tournament data: forced-token probability rank
+doesn't matter (ranks 2-5 each ~10% correct); the original-token branch is
+worst (8.6%) and reproduces the trace's wrong answer 51% of the time; spreading
+a fixed budget over more cuts with fewer alternatives does not help.

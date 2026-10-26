@@ -54,6 +54,16 @@ for path in sys.argv[2:]:
         top_p, top_i = logp.exp().topk(10, dim=-1)
         d["topk"] = [[[tok.decode([int(t)]), round(float(p), 4)] for t, p in zip(ti, tp)]
                      for ti, tp in zip(top_i.tolist(), top_p.tolist())]
+        # semantic local entropy (Part 1's embedding-weighted entropy) over the
+        # top-20, renormalized: probability mass on near-synonyms (cosine
+        # similarity of input embeddings, clamped at 0) doesn't count as
+        # uncertainty. H_sem = -sum_i p_i log2(sum_j S_ij p_j)
+        p20, i20 = logp.exp().topk(20, dim=-1)
+        p20 = p20 / p20.sum(-1, keepdim=True)
+        emb = torch.nn.functional.normalize(model.get_input_embeddings().weight[i20].float(), dim=-1)
+        S = (emb @ emb.transpose(1, 2)).clamp(min=0)
+        sem = -(p20 * torch.log2((S @ p20.unsqueeze(-1)).squeeze(-1).clamp(min=1e-12))).sum(-1)
+        d["sem_local_ent"] = [round(float(v), 3) for v in sem]
         print(f"#{d['test_index']}: {n} tokens, mean local entropy {ent.mean():.3f} bits, "
               f"{(ent < 0.01).float().mean():.0%} near-zero", flush=True)
         del out

@@ -256,7 +256,7 @@ with open(OUT_PATH, "w") as f:
 
         prefix_cuts = []
         for cut in points:
-            prefix = prompt_ids + gen_ids[: cut + 1]
+            prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
             prefix_cuts.append((cut, prefix))
 
         forced_pairs = []

@@ -223,7 +223,7 @@ with open(OUT_PATH, "w") as f:
             probs = torch.softmax(logits, dim=-1)
             topv, topi = torch.topk(probs, N_BRANCHES)
             sampled_idx = sample_without_replacement(probs, N_BRANCHES)
-            prefix = prompt_ids + gen_ids[: cut + 1]
+            prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
             topk_pairs.extend((prefix, tok) for tok in topi.tolist())
             sample_pairs.extend((prefix, tok) for tok in sampled_idx)
             point_order.append(cut)

@@ -194,7 +194,7 @@ with open(OUT_PATH, "w") as f:
                 topv, topi = torch.topk(probs, N_BRANCHES)
                 forced_tokens = topi.tolist()
                 forced_probs = topv.tolist()
-                prefix = prompt_ids + gen_ids[: cut + 1]
+                prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
                 per_candidate_meta.append({
                     "cut": cut, "selection_method": selection_method, "pos": pos,
                     "forced_tokens": forced_tokens, "forced_probs": forced_probs,

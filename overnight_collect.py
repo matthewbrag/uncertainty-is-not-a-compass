@@ -179,7 +179,7 @@ with open(OUT_PATH, "w") as f:
             forced_tokens = topi.tolist()
             forced_probs = topv.tolist()
 
-            prefix = prompt_ids + gen_ids[: cut + 1]
+            prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
             texts = greedy_branches(prefix, forced_tokens, CONT_MAX_NEW_TOKENS)
 
             n_correct = 0

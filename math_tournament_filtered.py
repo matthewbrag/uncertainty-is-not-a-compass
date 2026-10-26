@@ -316,7 +316,7 @@ with open(OUT_PATH, "w") as f:
             topv, topi = torch.topk(probs, N_BRANCHES)
             forced_tokens = topi.tolist()
             point_to_tokens[cut] = forced_tokens
-            prefix = prompt_ids + gen_ids[: cut + 1]
+            prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
             forced_pairs.extend((prefix, tok) for tok in forced_tokens)
             point_order.append(cut)
 

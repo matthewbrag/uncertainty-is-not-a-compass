@@ -34,16 +34,21 @@ MODEL_KEY = sys.argv[1]
 LEVEL = int(sys.argv[2])
 MAX_PROBLEMS = int(sys.argv[3])
 SEED = int(sys.argv[4]) if len(sys.argv) > 4 else 3000
+SHARD_OFFSET = int(sys.argv[5]) if len(sys.argv) > 5 else 0
+OUT_PATH_OVERRIDE = sys.argv[6] if len(sys.argv) > 6 else None
 
 LAYERS = [6, 10, 14, 18, 22, 26, 28]
 N_CANDIDATES_PER_TRACE = 5
 N_RANDOM_CANDIDATES_PER_TRACE = 2
 N_BRANCHES = 5
-GEN_MAX_NEW_TOKENS = 500  # MATH solutions run longer than GSM8K
-CONT_MAX_NEW_TOKENS = 300
-GEN_BATCH_SIZE = 64  # sweet spot measured for both 0.6b and 1.7b today
+# p95-calibrated budgets, matching shared_trace_monotonic.py (see NOTES.md
+# "Natural-length measurement") -- was 500/300, which truncated heavily
+GEN_MAX_NEW_TOKENS = 1500
+CONT_MAX_NEW_TOKENS = 1300
+GEN_BATCH_SIZE = 32
+MAX_BRANCH_BATCH = 15  # 35 forced branches per problem at 1300 tokens OOMs unchunked
 SAMPLE_KW = dict(temperature=0.7, top_k=20, top_p=0.8)
-OUT_PATH = f"math_level{LEVEL}_{MODEL_KEY}.jsonl"
+OUT_PATH = OUT_PATH_OVERRIDE or f"math_level{LEVEL}_{MODEL_KEY}.jsonl"
 
 
 def parse_numeric(a):
@@ -139,8 +144,15 @@ def generate_batch_sampled(prompt_ids_list, max_new_tokens):
 
 
 def greedy_branches_all_candidates(prefixes_and_tokens, max_new_tokens):
-    """Batches ALL (prefix, forced_first_token) pairs for a problem into one
-    generate() call, instead of looping per-candidate at batch=N_BRANCHES."""
+    texts = []
+    for start in range(0, len(prefixes_and_tokens), MAX_BRANCH_BATCH):
+        texts.extend(_greedy_branches_chunk(prefixes_and_tokens[start:start + MAX_BRANCH_BATCH], max_new_tokens))
+    return texts
+
+
+def _greedy_branches_chunk(prefixes_and_tokens, max_new_tokens):
+    """Batches (prefix, forced_first_token) pairs into one generate() call,
+    instead of looping per-candidate at batch=N_BRANCHES."""
     batch_ids = [prefix + [tok] for prefix, tok in prefixes_and_tokens]
     max_len = max(len(x) for x in batch_ids)
     pad_id = tokenizer.pad_token_id
@@ -179,7 +191,7 @@ def binary_entropy(p):
 random.seed(SEED)
 all_indices = list(range(len(math_train)))
 random.shuffle(all_indices)
-shard_indices = all_indices[:MAX_PROBLEMS]
+shard_indices = all_indices[SHARD_OFFSET:SHARD_OFFSET + MAX_PROBLEMS]
 
 n_done = 0
 n_points = 0
@@ -237,7 +249,7 @@ with open(OUT_PATH, "w") as f:
                 topv, topi = torch.topk(probs, N_BRANCHES)
                 forced_tokens = topi.tolist()
                 forced_probs = topv.tolist()
-                prefix = prompt_ids + gen_ids[: cut + 1]
+                prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
                 per_candidate_meta.append({
                     "cut": cut, "selection_method": selection_method, "pos": pos,
                     "forced_tokens": forced_tokens, "forced_probs": forced_probs,

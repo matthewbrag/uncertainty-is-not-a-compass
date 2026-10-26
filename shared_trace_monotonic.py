@@ -37,9 +37,9 @@ import math
 
 K_POINTS = 5
 N_BRANCHES = 5
-GEN_MAX_NEW_TOKENS = 650
-CONT_MAX_NEW_TOKENS = 450
-MAX_BRANCH_BATCH = 40
+GEN_MAX_NEW_TOKENS = 1500
+CONT_MAX_NEW_TOKENS = 1300
+MAX_BRANCH_BATCH = 15
 SAMPLE_KW = dict(temperature=0.7, top_k=20, top_p=0.8)
 NOISE_SEED_BASE = 92000
 HYBRID_TEMPERATURE = 1.0
@@ -234,7 +234,7 @@ all_indices = list(range(len(math_test)))
 random.shuffle(all_indices)
 problem_indices = all_indices[SHARD_OFFSET:SHARD_OFFSET + N_PROBLEMS]
 
-GEN_BATCH_SIZE = 64
+GEN_BATCH_SIZE = 32
 
 n_done = 0
 n_skipped_correct_greedy = 0
@@ -314,7 +314,7 @@ with open(OUT_PATH, "w") as f:
             topv, topi = torch.topk(probs, N_BRANCHES)
             forced_tokens = topi.tolist()
             point_to_tokens[cut] = forced_tokens
-            prefix = prompt_ids + gen_ids[: cut + 1]
+            prefix = prompt_ids + gen_ids[:cut]  # forced token REPLACES gen_ids[cut] (hs at base+cut-1 predicts it)
             forced_pairs.extend((prefix, tok) for tok in forced_tokens)
             point_order.append(cut)
 

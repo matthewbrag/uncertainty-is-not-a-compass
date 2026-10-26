@@ -458,3 +458,31 @@ Git-initialized, committed (`/home/matthew/projects/ml-experiments/tree2`).
 Core pipeline at top level, superseded/exploratory scripts in `legacy/`.
 README documents the pipeline. Raw data gitignored (regeneratable, too big
 for git anyway).
+
+## CORRECTED run (2026-10-26, after the off-by-one fix -- supersedes every forced-branch number above)
+
+Ground truth re-collected (900 MATH-L4 train problems, 6300 points, 1500/1300
+budgets). All-5-branches-agree rose 44.2% -> 54.3%, mean diversity 0.770 ->
+0.616 (the misplaced token was manufacturing disagreement). Diversity probe,
+held-out r by layer: 6=.49 10=.49 14=.51 **18=.56** 22=.53 26=.53 28=.53
+(best layer moved 14 -> 18). Concatenating all 7 recorded layers: r=.560, no
+gain over layer 18 alone (layers are redundant for this target).
+
+Tournament (829 test problems, 377 greedy-wrong scored, layer-18 probe):
+uniform 45.4%, random 44.8%, hybrid_spaced_softmax 43.2%, alpha0.25 43.0%,
+0.5 42.4%, 0.75 42.2%, pure probe 40.8%, pure noise 40.6%. Branch cap-hit
+17.8% (7.6% of correct branches, 18.7% of wrong). Trace cap-hit 20.8%.
+
+Why the probe loses (debug_strategy_trace.py + analysis):
+- It's a digit detector: digits are 31% of cuts but 81% of its top-10% scores.
+- Global top-5 picks skew late (35% in the last fifth) and clump (median gap
+  33 tokens, 25% within 5 tokens).
+- Per-cut rescue falls with position: 28% (first fifth) -> 13.6% (last).
+- BUT within a position band, diversity does predict rescue (oracle high vs
+  low: 25/10, 23/14, 18/6 %; probe: 20/15, 20/14, 14/8 %) -- target is fine,
+  selection is the problem.
+- Uniform's edge is structural: its cut at token 0 is a 5-way restart that
+  alone rescues 32.1%; uniform without it = 36.3%. Its last cut is EOS (wasted).
+- "Rescue" mixes restarts, final-answer digit lottery (e.g. forcing "1"->"2" in
+  "Final Answer: 18"), and genuine repair. Next tournament should save trace
+  ids so rescues can be classified post hoc.

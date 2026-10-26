@@ -6,7 +6,7 @@ as export_probe_generic.py / export_probe_p_target.py, which only covered the
 binary outcome_entropy and outcome_p targets. Also reports a held-out
 (split by problem) correlation so the Part 1 table can be refreshed.
 
-Usage: python export_probe_diversity.py <model_key> <in_path> <layer> <out_path>
+Usage: python export_probe_diversity.py <model_key> <in_path> <layer|best> <out_path>
 """
 import json
 import math
@@ -56,13 +56,21 @@ rng = np.random.default_rng(0)
 rng.shuffle(uniq)
 test_keys = set(uniq[: len(uniq) // 5].tolist())
 is_test = np.array([k in test_keys for k in keys])
+held_out_r = {}
 for L in sorted(X_by_layer, key=int):
     XL = X_by_layer[L]
     sc = StandardScaler().fit(XL[~is_test])
     held = RidgeCV(alphas=np.logspace(-2, 8, 30)).fit(sc.transform(XL[~is_test]), y[~is_test])
     pred = held.predict(sc.transform(XL[is_test]))
-    print(f"layer {L:>2}: held-out (by problem) r={np.corrcoef(pred, y[is_test])[0, 1]:.4f}  "
+    r_heldout = np.corrcoef(pred, y[is_test])[0, 1]
+    held_out_r[L] = r_heldout
+    print(f"layer {L:>2}: held-out (by problem) r={r_heldout:.4f}  "
           f"R2={r2_score(y[is_test], pred):.4f}  (n_test={is_test.sum()})", flush=True)
+if LAYER == "best":
+    # pick by held-out r on TRAIN-split problems only (tournament uses the
+    # test split), same criterion the original layer choices were made on
+    LAYER = max(held_out_r, key=held_out_r.get)
+    print(f"best layer by held-out r: {LAYER}", flush=True)
 X = X_by_layer[LAYER]
 
 # final artifact trains on everything

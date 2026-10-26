@@ -27,26 +27,26 @@ run3() {  # run3 <name> <cmd-template with {g}> ; waits for all 3 GPUs
 say "F1: MATH-L3 1.7B collection (3 x 300)"
 if run3 collect_fixed_l3 'python math_collect_batched.py qwen3-1.7b 3 300 3000 $(({g} * 300)) math_level3_qwen3-1.7b_fixed_shard{g}.jsonl'; then
   cat math_level3_qwen3-1.7b_fixed_shard{0,1,2}.jsonl > math_level3_qwen3-1.7b_fixed.jsonl
-  python export_probe_diversity.py qwen3-1.7b math_level3_qwen3-1.7b_fixed.jsonl 18 \
-    entropy_probe_1.7b_diversity_level3_layer18_fixed.json 2>&1 | tee -a "$LOG"
+  python export_probe_diversity.py qwen3-1.7b math_level3_qwen3-1.7b_fixed.jsonl best \
+    entropy_probe_1.7b_diversity_level3_best_fixed.json 2>&1 | tee -a "$LOG"
 fi
 
 say "F2: GSM8K 1.7B collection (3 x 500)"
 if run3 collect_fixed_gsm17 'python overnight_collect_batched.py qwen3-1.7b {g} 3 500 overnight_qwen3-1.7b_fixed_shard{g}.jsonl'; then
   cat overnight_qwen3-1.7b_fixed_shard{0,1,2}.jsonl > gsm8k_qwen3-1.7b_fixed.jsonl
-  python export_probe_diversity.py qwen3-1.7b gsm8k_qwen3-1.7b_fixed.jsonl 22 \
-    entropy_probe_1.7b_diversity_gsm8k_layer22_fixed.json 2>&1 | tee -a "$LOG"
+  python export_probe_diversity.py qwen3-1.7b gsm8k_qwen3-1.7b_fixed.jsonl best \
+    entropy_probe_1.7b_diversity_gsm8k_best_fixed.json 2>&1 | tee -a "$LOG"
 fi
 
 say "F3: GSM8K 0.6B collection (3 x 500)"
 if run3 collect_fixed_gsm06 'python overnight_collect_batched.py qwen3-0.6b {g} 3 500 overnight_qwen3-0.6b_fixed_shard{g}.jsonl'; then
   cat overnight_qwen3-0.6b_fixed_shard{0,1,2}.jsonl > gsm8k_qwen3-0.6b_fixed.jsonl
-  python export_probe_diversity.py qwen3-0.6b gsm8k_qwen3-0.6b_fixed.jsonl 22 \
-    entropy_probe_0.6b_diversity_gsm8k_layer22_fixed.json 2>&1 | tee -a "$LOG"
+  python export_probe_diversity.py qwen3-0.6b gsm8k_qwen3-0.6b_fixed.jsonl best \
+    entropy_probe_0.6b_diversity_gsm8k_best_fixed.json 2>&1 | tee -a "$LOG"
 fi
 
-if [ -f entropy_probe_1.7b_diversity_level3_layer18_fixed.json ]; then
+if [ -f entropy_probe_1.7b_diversity_level3_best_fixed.json ]; then
   say "F4: MATH-L3 tournament with fixed L3 probe (3 shards)"
-  run3 tournament_fixed_l3 'python shared_trace_monotonic.py qwen3-1.7b 3 entropy_probe_1.7b_diversity_level3_layer18_fixed.json 300 $(({g} * 300)) shared_trace_fixed_level3_offset$(({g} * 300)).jsonl'
+  run3 tournament_fixed_l3 'python shared_trace_monotonic.py qwen3-1.7b 3 entropy_probe_1.7b_diversity_level3_best_fixed.json 300 $(({g} * 300)) shared_trace_fixed_level3_offset$(({g} * 300)).jsonl'
 fi
 say "FOLLOWUPS: ALL DONE"

@@ -537,3 +537,40 @@ Also from the vLLM advanced tournament data: forced-token probability rank
 doesn't matter (ranks 2-5 each ~10% correct); the original-token branch is
 worst (8.6%) and reproduces the trace's wrong answer 51% of the time; spreading
 a fixed budget over more cuts with fewer alternatives does not help.
+
+## Fork pruning + 2x2 ablation (2026-10-26) -- earlier "positive result" did NOT survive the ablation
+
+fork_prune_tournament.py (lookahead pruning: 32-token greedy lookahead per
+candidate branch, drop branches that rejoin the original path or duplicate a
+sibling, complete the best 20) first looked like a win: semprod_pruned 51.6%
+"any" vs equal-compute best-of-N 45.8% (+34/-12, p=0.002), and beat both
+no-prune arms. BUT the pruned arm also searched 12 candidate cuts vs 5.
+
+fork_prune_ablation.py: 2x2 {semantic-product cuts, evenly spaced cuts} x
+{prune, no prune}, every cell 12 cuts + token 0 and 20 completed branches.
+382 scored problems:
+  semprod_pruned 49.2% any / 18.6% maj; semprod_noprune 48.7 / 14.7;
+  uniform_pruned 48.2 / 17.8; uniform_noprune 47.6 / 14.9.
+  Pruning effect: any n.s. (p~0.87); MAJORITY +22/-7 p=0.008 (semprod),
+    +19/-8 p=0.052 (uniform). Pruning removes re-votes for the wrong answer.
+  Heuristic effect (semprod vs uniform cuts): none, p=0.6-1.0 either way.
+  vs equal-compute best-of-N: any +32/-24 p=0.35 (the p=0.002 did not
+    replicate: wider search + run-to-run noise of 2-3 pts); majority 18.6 vs
+    21.7, p=0.10 (gap narrowed from ~8 to ~3 pts).
+  Rejoin rate: 35.7% of alternatives at semantic-product cuts vs 45.4% at
+    evenly spaced cuts -> the heuristic's cuts do produce more genuinely
+    divergent alternatives; it just doesn't change outcomes.
+
+Rejoin detector: exact tail-string match missed whitespace/markdown/LaTeX
+variants; normalized match fixed it (verified by reading lookahead dumps).
+
+## Fork-detection benchmark (2026-10-26, 59 wrong traces; extension running)
+
+Ground truth: TV distance of final-answer distributions sampled (16/side)
+from just before vs just after a token. Real fork = TV above null 95th pct
+(0.56): 10% of random positions. Top-3 pick lift over random: probe 1.01x,
+local 1.30x, sem_local 1.07x, product 1.46x, sem_product 1.24x, earliness
+1.52x. Every entropy heuristic correlates +0.36-0.41 with position while fork
+strength falls with position; position-controlled rank correlations are all
+~0 (-0.002..+0.065). Product is the best content heuristic but no better than
+"branch early".

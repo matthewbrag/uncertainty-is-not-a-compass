@@ -16,7 +16,7 @@ semantic local entropy (embedding-weighted, synonyms discounted), their
 products with the probe, and earliness (1 - relative position) as a
 position-only baseline.
 
-Usage (.venv-vllm): CUDA_VISIBLE_DEVICES=<gpu> python fork_detection_benchmark.py <probe_path> <queue_file> <out_path> [max_problems]
+Usage (.venv-vllm): CUDA_VISIBLE_DEVICES=<gpu> python fork_detection_benchmark.py <probe_path> <queue_file> <out_path> [max_problems] [offset]
 """
 import fcntl
 import json
@@ -79,6 +79,8 @@ for r in concatenate_datasets([load_dataset("EleutherAI/hendrycks_math", s, spli
         math_test.append({"problem": r["problem"], "reference_answer": ref})
 order = list(range(len(math_test)))
 random.Random(7000).shuffle(order)
+OFFSET = int(sys.argv[5]) if len(sys.argv) > 5 else 0  # extend the benchmark without reusing problems
+order = order[OFFSET:]
 if MAX_PROBLEMS:
     order = order[:MAX_PROBLEMS]
 

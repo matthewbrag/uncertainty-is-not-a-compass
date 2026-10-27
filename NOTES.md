@@ -658,3 +658,13 @@ Solved within budget:  @2k   @3k   @4k   @8k
 Hybrid advantage survives the greedy/sampled confound (~+4-8 pts at 2-4k).
 Which fork method wins flips between runs (random first time, local here):
 fork choice is noise; the gain is cheap shared-prefix branches off fresh samples.
+
+## Race rerun with branch probabilities (2026-10-26; race_p_w*.jsonl, sampled branches)
+Probability cutoff on forced alternatives (exclude p < thr; fork skipped if none left):
+no meaningful change. In the race, branches below 0.001% are correct 11.3% vs
+12.5% above 10% (the 6300-point collection's 5.1%-vs-10% gap, conditional on a
+wrong top-1 branch, did not carry over). Local-entropy forks never force <0.001%
+tokens (0%); random forks do 76% of the time; gated 10%. Cutoffs make random
+forks behave more like resampling (fewer wins AND fewer losses), same net gain.
+Third replicate of the hybrid win: local hybrid @4k 56.4% vs resample 48.4%
+(+27/-7, p<0.001); random hybrid @4k 53.2% (+20/-8, p=0.04).

@@ -128,4 +128,10 @@ print(f"\n[{LABEL}] === HONEST TEST-SET RESULTS ===", flush=True)
 print(f"[{LABEL}] val-winner ({best_name}): test_R2={test_r2:+.4f}  test_r={test_r:+.4f}", flush=True)
 print(f"[{LABEL}] ridge (for reference):    test_R2={ridge_test_r2:+.4f}  test_r={ridge_test_r:+.4f}", flush=True)
 print(f"[{LABEL}] best single-unit bottleneck ({bottleneck1_best}): test_R2={b1_test_r2:+.4f}  test_r={b1_test_r:+.4f}", flush=True)
+# every config's test score too (the article table reports Ridge, boosting and
+# the best 1-4 unit bottleneck side by side, not just the val-winner)
+print(f"\n[{LABEL}] test R2 for every config:", flush=True)
+for name, m in results.items():
+    pred = m.predict(X_test_s)
+    print(f"[{LABEL}]   {name:22s} test_R2={r2_score(y_test, pred):+.4f}  test_r={np.corrcoef(pred, y_test)[0, 1]:+.4f}", flush=True)
 print(f"[{LABEL}] Done.", flush=True)

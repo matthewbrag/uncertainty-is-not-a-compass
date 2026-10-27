@@ -595,3 +595,20 @@ over random), sem_product 1.29x, earliness 1.54x. Position-controlled rho all
 +0.02..+0.04. With more data product's edge over local entropy alone vanished
 (was 1.58x vs 1.35x at 95 traces): local entropy carries the fork signal, the
 outcome probe adds ~nothing, and "branch early" is as good as any of them.
+
+## Divergence gate (2026-10-26, post-hoc on the vLLM tournament's saved traces, 250 integer-answer problems)
+
+gate_addon.py / analyze_gate.py. Candidates per quarter: top-8 by product and by
+local entropy; gates over the non-original top alternatives:
+  next-step divergence = prob-weighted JS divergence of next-token distributions
+  lookahead divergence = prob-weighted share of 16-token greedy lookaheads that
+                         do NOT rejoin the original continuation
+Results (rescued / majority / solved within 4k tokens):
+  product x lookdiv 73.2% / 22.4% / 49.6%  (best branching rescue rate tested)
+  local x lookdiv   70.8% / 23.2% / 48.8%
+  product x nextdiv 69.6% / 20.8% / 49.2%  (next-step gate doesn't help: paraphrases
+                                             differ on the next token, converge later)
+  product 71.6 / 20.8 / 49.2; local 71.2 / 19.2 / 48.0; restart+even 68.8 / 20.8 / 48.4
+Paired: product x lookdiv vs restart+even rescue +23/-12 p=0.09; local x lookdiv vs
+local majority +12/-2 p=0.01 (borderline after ~9 comparisons). Fresh samples still
+79.2% / 35.6%. Lookahead divergence is the useful third term; nothing beats resampling.

@@ -167,21 +167,23 @@ with open(OUT_PATH, "w") as f:
                     "random": random.Random(pr["r"]["math_test_index"] * 31 + k).randrange(1, sg["hi"]),
                 }
                 for name, t in picks.items():
-                    alts = [tk for tk, _ in sg["top5"][t] if tk != gen[t]][:4]
+                    alts = [(tk, pb) for tk, pb in sg["top5"][t] if tk != gen[t]][:4]
                     diverges = {tk: d for tk, _, d in g["div"].get(t, [])}
                     s["forks"][name] = {"pos": t, "token": tokenizer.decode([gen[t]]), "branches": [],
-                                        "gate_tokens": g["tokens"] if name == "gated" else 0}
-                    for tk in alts:
+                                        "gate_tokens": g["tokens"] if name == "gated" else 0,
+                                        "local": round(float(sg["le"][t]), 4), "product": round(float(sg["prod"][t]), 4),
+                                        "lookdiv": round(lookdiv[t], 4) if t in lookdiv else None}
+                    for tk, pb in alts:
                         todo.append(pr["r"]["prompt_token_ids"] + gen[:t] + [tk])
-                        owner.append((i, k, name, tk, diverges.get(tk)))
+                        owner.append((i, k, name, tk, diverges.get(tk), pb))
         outs = generate(llm, todo, CONT_MAX, sample=SAMPLED_BRANCHES,
                         seeds=[probs[i]["r"]["math_test_index"] * 7919 + k * 101 + j for j, (i, k, *_) in enumerate(owner)]
                         if SAMPLED_BRANCHES else None) if todo else []
-        for (i, k, name, tk, dv), row in zip(owner, outs):
+        for (i, k, name, tk, dv, pb), row in zip(owner, outs):
             s = probs[i]["samples"][k]
             ok = correct(tokenizer.decode(s["gen"][:s["forks"][name]["pos"]] + [tk] + row, skip_special_tokens=True),
                          probs[i]["r"]["reference_answer"])
-            s["forks"][name]["branches"].append({"length": len(row) + 1, "correct": ok, "diverges": dv})
+            s["forks"][name]["branches"].append({"length": len(row) + 1, "correct": ok, "diverges": dv, "prob": pb})
         for pr in probs:
             f.write(json.dumps({"math_test_index": pr["r"]["math_test_index"],
                                 "reference_answer": pr["r"]["reference_answer"],

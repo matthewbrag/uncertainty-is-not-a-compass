@@ -19,7 +19,18 @@ from collections import Counter
 import numpy as np
 
 R = [json.loads(l) for p in sys.argv[1:] for l in open(p)]
-HEUR = ["probe", "local", "sem_local", "product", "sem_product", "earliness"]
+HEUR = [h for h in ["probe", "local", "sem_local", "product", "sem_product", "rind", "rind_x_outcome",
+                    "product_x_lookdiv", "local_x_lookdiv", "product_x_nextdiv", "earliness"] if h in R[0]["top_positions"]]
+DERIVED = {"product_x_lookdiv": ("product", "lookdiv"), "local_x_lookdiv": ("local", "lookdiv"),
+           "product_x_nextdiv": ("product", "nextdiv")}
+
+
+def hv(p, h):
+    """A heuristic's value at a stored position (gated scores are base x gate)."""
+    if h in DERIVED:
+        b, g = DERIVED[h]
+        return p[b] * (p.get(g) or 0.0)
+    return p[h]
 
 
 def dist(ans):
@@ -62,7 +73,7 @@ for h in HEUR:
     for r in R:
         pts = [r["positions"][str(t)] for t in r["random_positions"]]
         if len(pts) >= 6:
-            rho = spearman([p[h] for p in pts], [p["fork_tv"] for p in pts])
+            rho = spearman([hv(p, h) for p in pts], [p["fork_tv"] for p in pts])
             if not np.isnan(rho):
                 rhos.append(rho)
     picks = [r["positions"][str(t)]["fork_tv"] for r in R for t in r["top_positions"][h]]
@@ -82,15 +93,15 @@ def partial_rank(x, y, z):
 
 
 print("\nposition-controlled within-trace rho (heuristic vs fork TV, partialling out position):")
-for h in HEUR[:-1]:
+for h in [x for x in HEUR if x != "earliness"]:
     vals = []
     for r in R:
         pts = [(t, r["positions"][str(t)]) for t in r["random_positions"]]
         if len(pts) >= 6:
-            v = partial_rank([p[h] for _, p in pts], [p["fork_tv"] for _, p in pts], [t for t, _ in pts])
+            v = partial_rank([hv(p, h) for _, p in pts], [p["fork_tv"] for _, p in pts], [t for t, _ in pts])
             if not np.isnan(v):
                 vals.append(v)
-    pos_corr = np.mean([spearman([p[h] for p in [r["positions"][str(t)] for t in r["random_positions"]]],
+    pos_corr = np.mean([spearman([hv(p, h) for p in [r["positions"][str(t)] for t in r["random_positions"]]],
                                  r["random_positions"]) for r in R if len(r["random_positions"]) >= 6])
     print(f"  {h:12s} partial rho {np.mean(vals):+.3f}   (its own rho with position: {pos_corr:+.3f})")
 

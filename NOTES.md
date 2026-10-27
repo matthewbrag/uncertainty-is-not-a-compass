@@ -574,3 +574,13 @@ local 1.30x, sem_local 1.07x, product 1.46x, sem_product 1.24x, earliness
 strength falls with position; position-controlled rank correlations are all
 ~0 (-0.002..+0.065). Product is the best content heuristic but no better than
 "branch early".
+
+## Fork-detection benchmark, final (2026-10-26, 155 wrong traces = 59 + 96 extension)
+
+Extension stopped early for a cooling break (in-flight chunks lost, ~10-15 traces).
+Real fork (TV > null 95th pct 0.56) at 8.7% of random positions. Top-3 lift:
+probe 0.94x, local 1.44x, sem_local 1.27x, product 1.47x (59/465 picks, ~3 SD
+over random), sem_product 1.29x, earliness 1.54x. Position-controlled rho all
++0.02..+0.04. With more data product's edge over local entropy alone vanished
+(was 1.58x vs 1.35x at 95 traces): local entropy carries the fork signal, the
+outcome probe adds ~nothing, and "branch early" is as good as any of them.

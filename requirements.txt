@@ -1,5 +1,13 @@
+# HF environment (.venv): data collection, probes, estimator checks, explorer dumps, the token-tree app.
+# torch is the CUDA 12.4 build: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
 torch==2.6.0+cu124
 transformers==5.20.2
 accelerate==1.15.0
-scikit-learn==1.9.1
+datasets==5.1.0
 numpy==2.5.4
+scikit-learn==1.9.1
+scipy==1.18.1
+fastapi==0.150.0
+uvicorn==0.54.0
+pydantic==2.14.1
+matplotlib==3.11.2

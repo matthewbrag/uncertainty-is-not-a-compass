@@ -4,6 +4,10 @@ Started 2026-10-22, because we forgot to take them earlier and it cost us a
 round-trip re-verifying which papers we'd already checked. Add to this as we
 go. Most important entries first within each section.
 
+(Script and data names below are from before the repo was reorganized: scripts
+now live under `experiments/`, `tools/` and `legacy/`, and data under `data/`.
+README.md has the layout.)
+
 ## Methodology traps (read this before trusting a new result)
 
 - **Stop rule truncated decimal answers (found + fixed 2026-10-26).** ForceEosAfterAnswer
@@ -465,7 +469,7 @@ tighten this but wasn't judged worth the compute given how large the gap is.
 
 ## Repo
 
-Git-initialized, committed (`/home/matthew/projects/ml-experiments/tree2`).
+Git-initialized and committed.
 Core pipeline at top level, superseded/exploratory scripts in `legacy/`.
 README documents the pipeline. Raw data gitignored (regeneratable, too big
 for git anyway).

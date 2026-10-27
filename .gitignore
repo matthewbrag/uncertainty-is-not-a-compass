@@ -1,3 +1,8 @@
+# Local data: everything the experiments read and write lives in data/ (multi-GB,
+# regeneratable by re-running the scripts against the public datasets and model).
+data/
+*.egg-info/
+
 # Raw collected data and logs -- large (multi-GB) and fully regeneratable
 # by running the collection scripts against the public datasets/model.
 # Not the source of truth; the scripts are.
@@ -14,6 +19,9 @@ __pycache__/
 *.npy
 util_log*.csv
 
-# entropy_probe_*.json artifacts (~100-900KB each) are NOT excluded above --
-# they're small enough to keep in git directly, unlike the raw *.jsonl data.
+# Probe artifacts in probes/ (~100-900KB each) are kept in git: they're small,
+# and the article's results depend on probes/entropy_probe_1.7b_diversity_level4_best_fixed.json.
 .venv-vllm/
+
+# Work-queue counters the GPU workers share during a run
+*_queue.txt

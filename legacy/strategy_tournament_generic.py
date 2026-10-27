@@ -14,7 +14,7 @@ import torch
 from datasets import load_dataset
 from transformers import LogitsProcessorList
 
-from app import (
+from forkprobe.hf import (
     get_model, DEFAULT_TEMPLATE, extract_answer, compute_entropy,
     ForceEosAfterAnswer, ForceEosOnRepetition, DEVICE,
 )

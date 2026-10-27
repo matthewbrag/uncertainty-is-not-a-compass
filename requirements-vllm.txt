@@ -1,0 +1,7 @@
+# vLLM environment (.venv-vllm): the tournaments, fork-detection benchmarks and the race.
+# vllm pins its own torch; install it first, then the rest.
+vllm==0.32.0
+transformers==5.19.0
+datasets==5.1.0
+numpy==2.3.5
+scikit-learn==1.9.1

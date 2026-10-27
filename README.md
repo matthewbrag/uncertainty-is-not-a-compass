@@ -1,73 +1,97 @@
-# Decode-tree entropy research
+# Uncertainty Is Not A Compass
 
-Investigating cheap proxies for finding decision-critical branch points in LLM
-decode trees — where in a reasoning trace does forcing a different token
-actually change the outcome, and can you predict that cheaply, without
-generating every alternative? Models: Qwen3-0.6B and Qwen3-1.7B, run locally
-on 3x RTX 3090s. Datasets: GSM8K and MATH (levels 3-4).
+Code for the article [*Uncertainty Is Not A Compass*](https://matthewbragonje.com/writing/uncertainty-is-not-a-compass/):
+can you predict where an LLM's reasoning forks, and does branching there help it
+find answers it got wrong? Qwen3-0.6B and Qwen3-1.7B on GSM8K and MATH, run
+locally on 3x RTX 3090.
 
-Full writeup: *Entropy Isn't Enough* (link once published).
+Short version of what's here:
 
-## Pipeline
+- **Ground truth.** At a token in a reasoning trace, force the model's top-5
+  next tokens, run each to an answer, and measure how many *distinct* answers
+  come out (diversity entropy). Later, a second ground truth for *natural*
+  forks: resample from just before vs. just after a token and see whether the
+  answer distribution shifts.
+- **Estimators.** Logit entropy, embedding-weighted entropy, a DRAGIN-style
+  score, and a linear probe on hidden states that predicts diversity entropy
+  (held-out r = 0.56 on MATH Level 4), plus their product.
+- **Search.** A tournament of branching strategies on 250 problems the model
+  got wrong, a noise ablation, fork-detection benchmarks, and a race between
+  resampling and resample-then-branch hybrids.
 
-1. **Collect forced-branch data** — `overnight_collect.py` / `overnight_collect_batched.py` (GSM8K)
-   and `math_collect_batched.py` (MATH). At candidate token positions in a greedy
-   trace, force the model's own top-5 most likely continuations, run each to
-   completion, and record which ones land on the correct final answer. Saves
-   per-position hidden states at 7 sampled layers (6, 10, 14, 18, 22, 26, 28),
-   raw softmax/logit-lens entropy at those layers, and the full set of forced
-   continuations' answers.
+[RESULTS.md](RESULTS.md) maps every number in the article to the script and
+data that produce it. [NOTES.md](NOTES.md) is the lab notebook: every run in
+order, including the bugs and the results that didn't survive replication.
 
-2. **Train a probe** — `export_entropy_probe.py` / `export_probe_generic.py` /
-   `export_probe_p_target.py`. A Ridge regression on the saved hidden states,
-   predicting either `outcome_p` (success probability) or `diversity_entropy`
-   (Shannon entropy over the *distinct* final answers the 5 forced branches
-   produce — a better target than binary correctness-entropy; see the writeup).
-   Produces a small (~100-900KB) JSON artifact: scaler + coefficients + layer.
+## Layout
 
-3. **Run the tournament** — `math_tournament.py` / `math_tournament_diversity.py`
-   / `math_tournament_filtered.py`. On held-out test problems, pick 5 branch
-   points per problem under different strategies (trained probe, uniformly
-   spaced, random, filtered-for-filler-tokens) and check whether forcing
-   branches there ever rescues a problem the greedy decode got wrong.
+```
+forkprobe/            shared code (pip install -e .)
+  stop_rules.py         prompt template, answer parsing, repetition detection
+  hf.py                 HF model loading + generation stop rules
+  vllm_gen.py           vLLM backend with the same stop rules
+experiments/
+  1_collect/            forced-branch data collection (ground truth + hidden states)
+  2_estimators/         probe training and the estimator comparisons (Part 1)
+  3_tournament/         branching tournament, noise ablation, gate, voting, pruning (Part 2)
+  4_fork_detection/     natural-fork benchmarks
+  5_race/               resample vs. resample-then-branch
+  explorer/             builds the Fork Explorer's data from per-trace dumps
+probes/               trained probe artifacts (the article's is entropy_probe_1.7b_diversity_level4_best_fixed.json)
+runs/                 the launch scripts the article's runs used (3 GPUs, shared work queues)
+tools/                vLLM-vs-HF validation, the token-tree explorer app, smoke test, GPU benchmark
+legacy/               earlier pipeline versions, kept for the research trail; not maintained
+data/                 local data and logs (gitignored; multi-GB, regeneratable)
+```
 
-4. **Validate specific hypotheses**:
-   - `embedding_entropy_check.py` / `embedding_entropy_diversity_check.py` —
-     does weighting token-distribution entropy by embedding-space similarity
-     (so near-synonyms don't inflate the score) correlate better with the
-     ground truth than raw entropy?
-   - `dragin_reproduction_check.py` — faithful reproduction of DRAGIN's
-     published RIND score (Su et al., 2024, arXiv:2403.10081) against our
-     ground truth, as a published-method comparison.
-   - `filler_rate_check.py` — what words/tokens do entropy-based selection
-     strategies actually pick, and does filtering them out change anything?
-
-5. **`app.py`** — the interactive Token Tree Explorer used to manually poke at
-   individual decode trees during early exploration (local-only, loads a real
-   model; not needed to reproduce the written results).
-
-## `legacy/`
-
-Earlier pilots, superseded script versions (`strategy_tournament.py` through
-`_v5.py`), and one-off benchmarking/architecture-search scripts
-(`bottleneck_sweep.py`, `tune_entropy_head.py`, etc.) that fed into decisions
-upstream of the scripts above but aren't part of the current pipeline.
-Kept for the research trail, not meant to be run as-is.
-
-## Data
-
-Raw collected data (`*.jsonl`, multi-GB) is gitignored — it's fully
-regeneratable by running the collection scripts against the public
-datasets and model, and isn't the source of truth. Trained probe artifacts
-(`entropy_probe_*.json`) are small enough to keep in git directly.
+Run everything from the repo root; scripts read and write `data/` and `probes/`.
 
 ## Setup
 
+Two virtual environments, because vLLM pins its own torch:
+
 ```
-python3 -m venv .venv && source .venv/bin/activate
-pip install torch transformers accelerate scikit-learn numpy
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
+.venv/bin/pip install -e .
+
+python3 -m venv .venv-vllm
+.venv-vllm/bin/pip install -r requirements-vllm.txt
+.venv-vllm/bin/pip install -e .
 ```
 
-Requires an offline-cached copy of Qwen3-0.6B/1.7B and the GSM8K/MATH
-datasets (`HF_HUB_OFFLINE=1` is set in all run commands; drop it for a
-first run to let `transformers`/`datasets` download them).
+`.venv` runs collection, probes, the estimator checks and the explorer dumps;
+`.venv-vllm` runs the tournaments, fork-detection benchmarks and the race (each
+script's docstring says which). The first run downloads Qwen3 and the datasets
+from Hugging Face; after that, `HF_HUB_OFFLINE=1` skips the network.
+
+Check the whole pipeline end to end on a few problems (about 35 minutes on two GPUs):
+
+```
+tools/smoke_test.sh 0 1      # HF lane on GPU 0, vLLM lane on GPU 1
+```
+
+## Reproducing
+
+The analyses in [RESULTS.md](RESULTS.md) run on CPU from saved results. Regenerating
+those results from scratch follows `runs/`, in order:
+
+1. `runs/run_fixed_pipeline.sh` collects MATH Level 4 forced-branch data (3 GPUs,
+   about 5 hours), trains the probe, and runs the noise-ablation tournament
+   (`run_fixed_pipeline_stage23.sh` is its second half, as actually run).
+2. `runs/run_advanced_vllm.sh` runs the 9-strategy tournament (about 1 hour on vLLM).
+3. The fork-detection, gate, voting, pruning and race launchers in `runs/`.
+
+Multi-GPU runs share a file-locked work queue (`data/*_queue.txt`), so
+any number of workers can split a run.
+
+Two methodology traps worth knowing about, both found and fixed mid-project
+(details in NOTES.md): forced branching originally had an off-by-one that
+forced the wrong token slot, and the answer stop rule cut decimal answers short
+("#### 4.5" became "4."). Every result in the article uses the fixed code;
+the tournament analyses restrict to integer answers because some runs predate
+the decimal fix.
+
+## License
+
+MIT

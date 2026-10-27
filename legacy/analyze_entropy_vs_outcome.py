@@ -13,7 +13,7 @@ ones.
 import torch
 from transformers import LogitsProcessorList
 
-from app import (
+from forkprobe.hf import (
     get_model, gsm8k_test, DEFAULT_TEMPLATE, extract_answer, compute_entropy,
     ForceEosAfterAnswer, ForceEosOnRepetition, DEVICE, THINK_CLOSE,
 )

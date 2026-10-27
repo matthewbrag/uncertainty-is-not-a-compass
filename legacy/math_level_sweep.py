@@ -16,7 +16,7 @@ import torch
 from datasets import load_dataset
 from transformers import LogitsProcessorList
 
-from app import get_model, extract_answer, ForceEosAfterAnswer, ForceEosOnRepetition, DEVICE
+from forkprobe.hf import get_model, extract_answer, ForceEosAfterAnswer, ForceEosOnRepetition, DEVICE
 
 MODEL_KEY = "qwen3-1.7b"
 GEN_MAX_NEW_TOKENS = 500

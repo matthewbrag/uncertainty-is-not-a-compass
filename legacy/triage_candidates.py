@@ -22,7 +22,7 @@ import time
 import torch
 from transformers import LogitsProcessorList
 
-from app import get_model, extract_answer, ForceEosAfterAnswer, ForceEosOnRepetition, DEVICE
+from forkprobe.hf import get_model, extract_answer, ForceEosAfterAnswer, ForceEosOnRepetition, DEVICE
 
 MODEL_KEY = sys.argv[1] if len(sys.argv) > 1 else "qwen3-0.6b"
 IN_PATH = f"scan_results_{MODEL_KEY}.jsonl"

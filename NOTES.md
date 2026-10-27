@@ -647,3 +647,14 @@ Pooled v2+confirm (106 traces, random 11.7% real forks): earliness 1.43x,
 product_x_lookdiv 1.35x, rind_x_outcome 1.29x, product 1.21x, local 1.19x,
 rind 1.19x, probe 0.70x. No scorer beats "pick early tokens"; all gaps within
 noise. Same conclusion as the 155-trace run.
+
+## Race with sampled branches (2026-10-26; race_s_w*.jsonl) - greedy confound check
+Same fresh samples (resample row identical); fork branches now sampled.
+Solved within budget:  @2k   @3k   @4k   @8k
+  resample             41.2  46.4  48.4  58.0
+  hybrid_random        45.2  48.8  52.0  63.2  (@2k p=0.05, @8k p=0.04)
+  hybrid_local         44.8  50.4  56.0  62.0  (@4k +27/-8 p=0.001)
+  hybrid_gated (charged) still loses early.
+Hybrid advantage survives the greedy/sampled confound (~+4-8 pts at 2-4k).
+Which fork method wins flips between runs (random first time, local here):
+fork choice is noise; the gain is cheap shared-prefix branches off fresh samples.

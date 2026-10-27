@@ -612,3 +612,11 @@ Results (rescued / majority / solved within 4k tokens):
 Paired: product x lookdiv vs restart+even rescue +23/-12 p=0.09; local x lookdiv vs
 local majority +12/-2 p=0.01 (borderline after ~9 comparisons). Fresh samples still
 79.2% / 35.6%. Lookahead divergence is the useful third term; nothing beats resampling.
+
+## Fork detection v2 (2026-10-26, 45 wrong traces, offset 360; fork_det3_w*.jsonl)
+Lift of top-3 picks' real-fork rate over random positions (random = 13.9%):
+rind_x_outcome 1.55x, rind 1.33x, product_x_lookdiv 1.33x, product 1.28x,
+earliness 1.23x, local 1.17x, local_x_lookdiv 1.07x, probe 0.75x.
+product_x_lookdiv led at 29 traces (2.2x) and faded. All within noise (135 picks
+each). Outcome-weighted scores stay on top; confirmatory run (fork_det4, 150
+problems, offset 460) queued after the race.

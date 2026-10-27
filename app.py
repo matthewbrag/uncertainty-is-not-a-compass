@@ -516,8 +516,13 @@ class ForceEosAfterAnswer(LogitsProcessor):
                     # "60" not yet sampled) — only trust it once at least one
                     # more character has been generated past the number, proving
                     # the model itself moved on rather than us guessing mid-digit.
+                    # "#### 4." is not done yet either: a "." or "," right after
+                    # the digits may be the middle of "4.5" / "1,250", so wait for
+                    # a character that can't continue the number (this used to cut
+                    # decimal answers off at the point)
                     for m in ANSWER_MARKER_RE.finditer(segment):
-                        if m.end(1) < len(segment):
+                        nxt = segment[m.end(1):m.end(1) + 2]
+                        if nxt and not (nxt[0] in ".," and (len(nxt) < 2 or nxt[1].isdigit())):
                             self.matched[i] = True
                             break
 

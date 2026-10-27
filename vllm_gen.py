@@ -59,7 +59,9 @@ class StopRules(AdapterLogitsProcessor):
                 # because the check runs every step
                 tail = _tok.decode(output_ids[-24:], skip_special_tokens=True)
                 for m in ANSWER_MARKER_RE.finditer(tail):
-                    if m.end(1) < len(tail):
+                    # same rule as app.py: don't stop on "#### 4." -- it may be "4.5"
+                    nxt = tail[m.end(1):m.end(1) + 2]
+                    if nxt and not (nxt[0] in ".," and (len(nxt) < 2 or nxt[1].isdigit())):
                         state["done"] = True
                         break
                 if not state["done"] and detect_repetition(list(output_ids)):

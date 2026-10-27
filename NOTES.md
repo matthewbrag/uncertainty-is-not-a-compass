@@ -6,6 +6,17 @@ go. Most important entries first within each section.
 
 ## Methodology traps (read this before trusting a new result)
 
+- **Stop rule truncated decimal answers (found + fixed 2026-10-26).** ForceEosAfterAnswer
+  stopped as soon as one character followed "#### <digits>", so "#### 4.5" ended as
+  "#### 4." -> parsed as 4. 37/382 "wrong" traces in the vLLM tournament were cut off
+  this way (29 with non-integer references). Equal across all arms, so paired
+  comparisons were fair; decimal-answer problems were nearly unrescuable, and some
+  "rescues" were artifacts (forcing "####" early sidestepped the truncation). Re-analysis
+  on the 250 integer-answer problems (bug can't apply): every conclusion unchanged;
+  absolute rescue rates ~47% -> ~71%; paired win/loss counts nearly identical (all the
+  discordant problems were integer ones). Fixed in app.py and vllm_gen.py: wait for a
+  character that can't continue the number.
+
 - **Off-by-one in branch forcing (found + fixed 2026-10-25, commit a35e858).
   Invalidates every forced-branch number before that commit.** Forced tokens
   came from `hs[base+cut-1]` (the distribution predicting `gen_ids[cut]`) but

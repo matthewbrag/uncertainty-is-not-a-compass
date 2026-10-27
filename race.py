@@ -14,7 +14,8 @@ wrong, pick one fork three ways and force the 4 top non-original tokens there
 The analysis (race_analyze.py) replays policies over this shared pool, so all
 comparisons are paired.
 
-Usage (.venv-vllm): CUDA_VISIBLE_DEVICES=<gpu> python race.py <probe.json> <queue_file> <out_path>
+Usage (.venv-vllm): CUDA_VISIBLE_DEVICES=<gpu> python race.py <probe.json> <queue_file> <out_path> [sampled]
+  sampled: fork branches are sampled like the fresh samples (controls for greedy decoding)
 """
 import fcntl
 import glob
@@ -35,6 +36,7 @@ from app_stop_rules import extract_answer
 from vllm_gen import MODEL, make_llm, generate, _tok as tokenizer
 
 PROBE_PATH, QUEUE, OUT_PATH = sys.argv[1], sys.argv[2], sys.argv[3]
+SAMPLED_BRANCHES = len(sys.argv) > 4 and sys.argv[4] == "sampled"
 CHUNK, N_FRESH, N_FORKED, N_CAND, LOOK = 8, 16, 4, 16, 16
 GEN_MAX, CONT_MAX = 1500, 1300
 ANSWER_MARKERS = ["Final Answer", "\\boxed", "####"]
@@ -172,7 +174,9 @@ with open(OUT_PATH, "w") as f:
                     for tk in alts:
                         todo.append(pr["r"]["prompt_token_ids"] + gen[:t] + [tk])
                         owner.append((i, k, name, tk, diverges.get(tk)))
-        outs = generate(llm, todo, CONT_MAX, sample=False) if todo else []
+        outs = generate(llm, todo, CONT_MAX, sample=SAMPLED_BRANCHES,
+                        seeds=[probs[i]["r"]["math_test_index"] * 7919 + k * 101 + j for j, (i, k, *_) in enumerate(owner)]
+                        if SAMPLED_BRANCHES else None) if todo else []
         for (i, k, name, tk, dv), row in zip(owner, outs):
             s = probs[i]["samples"][k]
             ok = correct(tokenizer.decode(s["gen"][:s["forks"][name]["pos"]] + [tk] + row, skip_special_tokens=True),

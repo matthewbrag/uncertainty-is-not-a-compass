@@ -638,3 +638,12 @@ cheap continuations off fresh samples, NOT smart fork choice. Unlike branching
 off the original trace, fresh samples keep re-diversifying the prefix.
 Caveats: branches are greedy, fresh samples sampled (confound); prefix prefill not
 charged (cheap with prefix caching); ~30 paired tests; perfect verifier.
+
+## Fork detection confirmatory run (2026-10-26, 61 new wrong traces, offset 460; fork_det4_w*.jsonl)
+DRAGIN x outcome did NOT replicate: 1.55x (v2) -> 1.03x here. Confirm-only lifts:
+earliness 1.63x, product_x_lookdiv 1.36x, sem_local 1.25x, local 1.20x, product
+1.14x, rind / rind_x_outcome 1.03x, probe 0.65x.
+Pooled v2+confirm (106 traces, random 11.7% real forks): earliness 1.43x,
+product_x_lookdiv 1.35x, rind_x_outcome 1.29x, product 1.21x, local 1.19x,
+rind 1.19x, probe 0.70x. No scorer beats "pick early tokens"; all gaps within
+noise. Same conclusion as the 155-trace run.

@@ -620,3 +620,21 @@ earliness 1.23x, local 1.17x, local_x_lookdiv 1.07x, probe 0.75x.
 product_x_lookdiv led at 29 traces (2.2x) and faded. All within noise (135 picks
 each). Outcome-weighted scores stay on top; confirmatory run (fork_det4, 150
 problems, offset 460) queued after the race.
+
+## Race: resample vs resample-then-branch (2026-10-26, 250 integer-answer problems; race_w*.jsonl)
+race.py / race_analyze.py. 16 fresh samples per problem; on each of the first 4
+wrong ones, one fork (gated / local / random) with 4 greedy forced branches.
+Policies replayed over the shared pool, stop at first correct (perfect verifier).
+Solved within budget:            @1k    @2k    @3k    @4k    @8k
+  resample                      30.0   41.2   46.4   48.4   58.0
+  hybrid_random                 32.0   44.4   52.4   55.2   62.8   (@3k +21/-6 p=0.01, @4k +24/-7 p=0.003)
+  hybrid_gated_pruned (no gate charge) 33.2 43.2 50.4 53.2 62.4
+  hybrid_local                  31.2   41.2   50.4   51.2   58.8
+  hybrid_gated (charged ~1000 lookahead tok per wrong sample) loses early (@1k +0/-14)
+Why: after a wrong sample the next fresh sample is right only 14.4% (~870 tok);
+a branch off it is right ~9-12% for ~600 tok (shared prefix not re-decoded).
+The fork-picking heuristic doesn't matter (random ~ gated ~ local); the gain is
+cheap continuations off fresh samples, NOT smart fork choice. Unlike branching
+off the original trace, fresh samples keep re-diversifying the prefix.
+Caveats: branches are greedy, fresh samples sampled (confound); prefix prefill not
+charged (cheap with prefix caching); ~30 paired tests; perfect verifier.
